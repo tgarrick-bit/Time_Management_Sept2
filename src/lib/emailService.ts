@@ -52,6 +52,7 @@ export class EmailService {
 
     // On client side, just mark as initialized
     if (typeof window !== 'undefined') {
+  console.log({
       this.isInitialized = true;
       return;
     }
@@ -101,6 +102,7 @@ export class EmailService {
       
       // On client side, just log the email
       if (typeof window !== 'undefined') {
+  console.log({
           to: toEmail,
           subject: template.subject,
           from: `${this.config.fromName} <${this.config.fromEmail}>`
@@ -167,6 +169,7 @@ export class EmailService {
   async testEmailConfiguration(): Promise<{ success: boolean; message: string }> {
     try {
       if (typeof window !== 'undefined') {
+  console.log({
         return { 
           success: true, 
           message: 'Email service available in client mode' 
