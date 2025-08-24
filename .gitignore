@@ -1,1 +1,2 @@
- # Clear gitignore
+node_modules/
+.next/
