@@ -52,11 +52,10 @@ export class EmailService {
 
     // On client side, just mark as initialized
     if (typeof window !== 'undefined') {
-  console.log({
+      console.log('EmailService: Client-side initialization');
       this.isInitialized = true;
       return;
     }
-
     // On server side, try to initialize SMTP
     try {
       // Dynamic import for server-side only
@@ -167,13 +166,13 @@ export class EmailService {
 
   // Test email configuration
   async testEmailConfiguration(): Promise<{ success: boolean; message: string }> {
-    try {
       if (typeof window !== 'undefined') {
-  console.log({
+        console.log('EmailService: Testing configuration in client mode');
         return { 
           success: true, 
           message: 'Email service available in client mode' 
         };
+      }        };
       }
 
       // On server side, test SMTP configuration

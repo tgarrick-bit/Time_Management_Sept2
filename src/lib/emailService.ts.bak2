@@ -52,11 +52,10 @@ export class EmailService {
 
     // On client side, just mark as initialized
     if (typeof window !== 'undefined') {
-  console.log({
+      console.log('EmailService: Client-side initialization');
       this.isInitialized = true;
       return;
     }
-
     // On server side, try to initialize SMTP
     try {
       // Dynamic import for server-side only
