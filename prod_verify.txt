@@ -1,0 +1,16 @@
+    db    |   user   |              ts               
+----------+----------+-------------------------------
+ postgres | postgres | 2025-08-17 06:29:59.561519+00
+(1 row)
+
+     table_name      |                                                                                                                                                                           cols                                                                                                                                                                           
+---------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ clients             | id:uuid, name:text, code:text, contact_email:text, billing_address:jsonb, status:text, created_at:timestamp with time zone, updated_at:timestamp with time zone, address:text, contact_person:text, contact_phone:text, time_tracking_method:text, billing_details:text, is_active:boolean
+ project_assignments | id:uuid, user_id:uuid, project_id:uuid, hourly_rate_cents:integer, start_date:date, end_date:date, status:text, created_at:timestamp with time zone
+ projects            | id:uuid, client_id:uuid, name:text, code:text, description:text, hourly_rate_cents:integer, overtime_rate_cents:integer, requires_client_approval:boolean, status:text, start_date:date, end_date:date, created_at:timestamp with time zone, updated_at:timestamp with time zone, budget:numeric, is_active:boolean
+ tasks               | id:uuid, project_id:uuid, name:text, code:text, description:text, billable:boolean, status:text, created_at:timestamp with time zone
+ time_entries        | id:uuid, timesheet_id:uuid, project_id:uuid, task_id:uuid, entry_date:date, start_time:time without time zone, end_time:time without time zone, total_minutes:integer, break_minutes:integer, notes:text, location:text, billable:boolean, created_at:timestamp with time zone, updated_at:timestamp with time zone
+ timesheets          | id:uuid, user_id:uuid, week_start_date:date, total_minutes:integer, submitted_at:timestamp with time zone, client_approved_at:timestamp with time zone, client_approved_by:uuid, payroll_approved_at:timestamp with time zone, payroll_approved_by:uuid, rejection_reason:text, created_at:timestamp with time zone, updated_at:timestamp with time zone
+ users               | id:uuid, email:text, first_name:text, last_name:text, employee_id:text, phone_number:text, status:text, created_at:timestamp with time zone, updated_at:timestamp with time zone, full_name:text
+(7 rows)
+

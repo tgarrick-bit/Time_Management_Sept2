@@ -1,0 +1,33 @@
+    db    |   user   |              ts               
+----------+----------+-------------------------------
+ postgres | postgres | 2025-08-17 06:30:00.313994+00
+(1 row)
+
+         tbl         | count 
+---------------------+-------
+ approvals           |     0
+ clients             |     5
+ expense_items       |     0
+ expense_reports     |     0
+ export_batches      |     0
+ export_lines        |     0
+ project_assignments |     0
+ projects            |     6
+ tasks               |     6
+ time_entries        |     0
+ timesheets          |     1
+ user_clients        |     0
+ users               |     7
+(13 rows)
+
+     table_name      |                                                                                                                                                                                                                       cols                                                                                                                                                                                                                        
+---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ clients             | id:uuid, name:text, code:text, contact_email:text, billing_address:jsonb, status:text, created_at:timestamp with time zone, updated_at:timestamp with time zone, address:text, contact_person:text, contact_phone:text, time_tracking_method:text, billing_details:text, is_active:boolean
+ project_assignments | id:uuid, user_id:uuid, project_id:uuid, hourly_rate_cents:integer, start_date:date, end_date:date, status:text, created_at:timestamp with time zone, pay_rate:numeric, bill_rate:numeric
+ projects            | id:uuid, client_id:uuid, name:text, code:text, description:text, hourly_rate_cents:integer, overtime_rate_cents:integer, requires_client_approval:boolean, status:text, start_date:date, end_date:date, created_at:timestamp with time zone, updated_at:timestamp with time zone, budget:numeric, is_active:boolean
+ tasks               | id:uuid, project_id:uuid, name:text, code:text, description:text, billable:boolean, status:text, created_at:timestamp with time zone
+ time_entries        | id:uuid, timesheet_id:uuid, project_id:uuid, task_id:uuid, entry_date:date, start_time:time without time zone, end_time:time without time zone, total_minutes:integer, break_minutes:integer, notes:text, location:text, billable:boolean, created_at:timestamp with time zone, updated_at:timestamp with time zone, client_id:uuid, assignment_id:uuid, bill_rate_applied:numeric, status:USER-DEFINED, user_id:uuid, date:date, minutes:integer
+ timesheets          | id:uuid, user_id:uuid, week_start_date:date, total_minutes:integer, submitted_at:timestamp with time zone, client_approved_at:timestamp with time zone, client_approved_by:uuid, payroll_approved_at:timestamp with time zone, payroll_approved_by:uuid, rejection_reason:text, created_at:timestamp with time zone, updated_at:timestamp with time zone, status:USER-DEFINED
+ users               | id:uuid, email:text, first_name:text, last_name:text, employee_id:text, phone_number:text, status:text, created_at:timestamp with time zone, updated_at:timestamp with time zone, full_name:text, role:USER-DEFINED
+(7 rows)
+

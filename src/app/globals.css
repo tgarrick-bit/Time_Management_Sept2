@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  /* West End Workforce Brand Colors */
+  --primary-pink: #e31c79;
+  --dark-navy: #05202E;
+  --light-gray: #e5ddd8;
+  --dark-gray: #232020;
+  --blue-accent: #465079;
+  
+  --background: #ffffff;
+  --foreground: var(--dark-gray);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary-pink);
+  --color-secondary: var(--dark-navy);
+  --color-accent: var(--blue-accent);
+  --color-light: var(--light-gray);
+  --color-dark: var(--dark-gray);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: var(--dark-navy);
+    --foreground: var(--light-gray);
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--light-gray);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--blue-accent);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-pink);
+}
