@@ -46,7 +46,6 @@ export default function AdminExpenseManagement() {
   const fetchExpenseReports = async () => {
     try {
       setLoading(true)
-      console.log('🔍 Fetching expense reports from database...')
       
       // For now, we'll use mock data since the database might not be fully set up
       // In production, this would fetch from the expense_reports table with joins
@@ -103,7 +102,6 @@ export default function AdminExpenseManagement() {
       ]
       
       setExpenseReports(mockExpenseReports)
-      console.log('✅ Expense reports loaded:', mockExpenseReports.length)
     } catch (error) {
       console.error('❌ Error fetching expense reports:', error)
       setExpenseReports([])
@@ -114,7 +112,6 @@ export default function AdminExpenseManagement() {
 
   const handleApprove = async (reportId: string) => {
     try {
-      console.log('✅ Approving expense report:', reportId)
       // In production, this would update the database
       setExpenseReports(prev => prev.map(report => 
         report.id === reportId 
@@ -128,7 +125,6 @@ export default function AdminExpenseManagement() {
 
   const handleReject = async (reportId: string, reason: string) => {
     try {
-      console.log('❌ Rejecting expense report:', reportId, 'Reason:', reason)
       // In production, this would update the database
       setExpenseReports(prev => prev.map(report => 
         report.id === reportId 
@@ -170,7 +166,6 @@ export default function AdminExpenseManagement() {
   })
 
   const exportExpenseReports = () => {
-    console.log('📊 Exporting expense reports...')
     // In production, this would generate and download a CSV/Excel file
   }
 

@@ -50,11 +50,9 @@ export default function AdminSettings() {
   const fetchSettings = async () => {
     try {
       setLoading(true)
-      console.log('🔍 Fetching system settings...')
       
       // In production, this would fetch from a settings table or environment
       // For now, we'll use the default values
-      console.log('✅ Settings loaded')
     } catch (error) {
       console.error('❌ Error fetching settings:', error)
     } finally {
@@ -65,14 +63,12 @@ export default function AdminSettings() {
   const handleSave = async () => {
     try {
       setLoading(true)
-      console.log('💾 Saving system settings...')
       
       // In production, this would save to a settings table or environment
       await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
       
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
-      console.log('✅ Settings saved successfully')
     } catch (error) {
       console.error('❌ Error saving settings:', error)
     } finally {

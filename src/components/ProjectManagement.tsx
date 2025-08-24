@@ -84,14 +84,12 @@ export default function ProjectManagement() {
         updated_at: new Date().toISOString()
       }
     ]
-    console.log('📋 Loading demo clients:', demoClients.length)
     setClients(demoClients)
   }
 
   // Test database connection
   const testDatabaseConnection = async () => {
     try {
-      console.log('🔍 Testing database connection...')
       
       // Test if projects table exists and is accessible
       const { data, error } = await supabase
@@ -104,7 +102,6 @@ export default function ProjectManagement() {
         return false
       }
       
-      console.log('✅ Database connection successful')
       return true
     } catch (error) {
       console.error('❌ Database connection test error:', error)
@@ -115,7 +112,6 @@ export default function ProjectManagement() {
   // Test project creation with minimal data
   const testProjectCreation = async () => {
     try {
-      console.log('🧪 Testing project creation...')
       
       // Get first available client
       if (clients.length === 0) {
@@ -124,7 +120,6 @@ export default function ProjectManagement() {
       }
       
       const testClient = clients[0]
-      console.log('🧪 Using test client:', testClient.name)
       
       const testProject = {
         name: 'Test Project - ' + new Date().toISOString().slice(0, 19),
@@ -137,7 +132,6 @@ export default function ProjectManagement() {
         is_active: true
       }
       
-      console.log('🧪 Test project data:', testProject)
       
       const { data, error } = await supabase
         .from('projects')
@@ -150,7 +144,6 @@ export default function ProjectManagement() {
         return
       }
       
-      console.log('✅ Test project created successfully:', data)
       alert('Test project created successfully! Database insert is working.')
       
       // Refresh data to show the new test project
@@ -169,7 +162,6 @@ export default function ProjectManagement() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      console.log('🔍 Fetching project data from database...')
       
       // Test database connection first
       const dbConnected = await testDatabaseConnection()
@@ -194,13 +186,10 @@ export default function ProjectManagement() {
         return
       }
       
-      console.log('✅ Clients fetched:', clientsData?.length || 0)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      console.log('📋 Available clients:', clientsData?.map((c: any) => ({ id: c.id, name: c.name, is_active: c.is_active })))
       
       // If no clients found, load demo clients
       if (!clientsData || clientsData.length === 0) {
-        console.log('⚠️ No clients found in database, loading demo clients')
         loadDemoClients()
         setLoading(false)
         return
@@ -221,7 +210,6 @@ export default function ProjectManagement() {
         // Continue with empty users list
         setUsers([])
       } else {
-        console.log('✅ Users fetched:', usersData?.length || 0)
         setUsers(usersData || [])
       }
 
@@ -238,7 +226,6 @@ export default function ProjectManagement() {
         console.error('❌ Error fetching projects:', projectsError)
         setProjects([])
       } else {
-        console.log('✅ Projects fetched:', projectsData?.length || 0)
         setProjects(projectsData || [])
       }
 
@@ -251,7 +238,6 @@ export default function ProjectManagement() {
       if (assignmentsError) {
         console.error('❌ Error fetching assignments:', assignmentsError)
       } else {
-        console.log('✅ Assignments fetched:', assignmentsData?.length || 0)
         
         // Update projects with assignments
         if (projectsData) {
@@ -278,29 +264,23 @@ export default function ProjectManagement() {
     e.preventDefault()
     
     alert('Form submitted! Check console for details.')
-    console.log('🚀 Form submitted!')
-    console.log('🚀 Submitting project form:', formData)
     
     // Form validation
     if (!formData.name.trim()) {
-      console.log('❌ Validation failed: Project name is empty')
       alert('Project name is required')
       return
     }
     
     if (!formData.client_id) {
-      console.log('❌ Validation failed: No client selected')
       alert('Please select a client')
       return
     }
     
     if (!formData.start_date) {
-      console.log('❌ Validation failed: No start date')
       alert('Start date is required')
       return
     }
     
-    console.log('✅ Form validation passed, proceeding with save...')
     
     // Validate dates
     if (formData.end_date && formData.start_date > formData.end_date) {
@@ -311,7 +291,6 @@ export default function ProjectManagement() {
     try {
       if (editingProject) {
         // Update existing project
-        console.log('📝 Updating existing project:', editingProject.id)
         const { error } = await supabase
           .from('projects')
           .update({
@@ -331,10 +310,8 @@ export default function ProjectManagement() {
           console.error('❌ Error updating project:', error)
           throw error
         }
-        console.log('✅ Project updated successfully')
       } else {
         // Create new project
-        console.log('🆕 Creating new project with data:', {
           name: formData.name,
           client_id: formData.client_id,
           description: formData.description,
@@ -378,7 +355,6 @@ export default function ProjectManagement() {
           throw new Error(detailedError)
         }
         
-        console.log('✅ Project created successfully:', data)
       }
 
       // Reset form and refresh data
@@ -571,7 +547,6 @@ export default function ProjectManagement() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="text-sm text-gray-600 mb-4">
-              Form submission test: <button type="button" onClick={() => console.log('Form data:', formData)}>Log Form Data</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -709,7 +684,6 @@ export default function ProjectManagement() {
                 <button
                   type="button"
                   onClick={() => {
-                    console.log('🧪 Testing direct save with current form data...')
                     // Create a fake event to test the save function
                     const fakeEvent = { preventDefault: () => {} } as React.FormEvent
                     handleSubmit(fakeEvent)

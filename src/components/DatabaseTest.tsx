@@ -32,7 +32,6 @@ export default function DatabaseTest() {
 
     try {
       // Test 1: Basic connection
-      console.log('🔍 Testing basic connection...')
       const { data: connectionData, error: connectionError } = await supabase
         .from('clients')
         .select('count')
@@ -43,11 +42,9 @@ export default function DatabaseTest() {
         console.error('❌ Connection test failed:', connectionError)
       } else {
         results.connection = true
-        console.log('✅ Connection test passed')
       }
 
       // Test 2: Check if tables exist
-      console.log('🔍 Testing table access...')
       const { data: tableData, error: tableError } = await supabase
         .from('clients')
         .select('*')
@@ -58,11 +55,9 @@ export default function DatabaseTest() {
         console.error('❌ Table test failed:', tableError)
       } else {
         results.tables = true
-        console.log('✅ Table test passed')
       }
 
       // Test 3: Test insert operation
-      console.log('🔍 Testing insert operation...')
       const testClient = {
         name: `Test Client ${Date.now()}`,
         contact_person: 'Test Person',
@@ -82,10 +77,8 @@ export default function DatabaseTest() {
         console.error('❌ Insert test failed:', insertError)
       } else {
         results.insert = true
-        console.log('✅ Insert test passed:', insertData)
         
         // Test 4: Test select operation
-        console.log('🔍 Testing select operation...')
         const { data: selectData, error: selectError } = await supabase
           .from('clients')
           .select('*')
@@ -97,11 +90,9 @@ export default function DatabaseTest() {
           console.error('❌ Select test failed:', selectError)
         } else {
           results.select = true
-          console.log('✅ Select test passed:', selectData)
         }
 
         // Test 5: Test update operation
-        console.log('🔍 Testing update operation...')
         const { error: updateError } = await supabase
           .from('clients')
           .update({ contact_person: 'Updated Test Person' })
@@ -112,11 +103,9 @@ export default function DatabaseTest() {
           console.error('❌ Update test failed:', updateError)
         } else {
           results.update = true
-          console.log('✅ Update test passed')
         }
 
         // Test 6: Test delete operation
-        console.log('🔍 Testing delete operation...')
         const { error: deleteError } = await supabase
           .from('clients')
           .delete()
@@ -127,7 +116,6 @@ export default function DatabaseTest() {
           console.error('❌ Delete test failed:', deleteError)
         } else {
           results.delete = true
-          console.log('✅ Delete test passed')
         }
       }
 

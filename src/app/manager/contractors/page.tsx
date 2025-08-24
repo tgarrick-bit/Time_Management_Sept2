@@ -71,7 +71,6 @@ export default function ManagerContractorsPage() {
 
   const handleSendMessage = (employeeId: string) => {
     // In real implementation, this would open a messaging interface
-    console.log('Send message to:', employeeId);
   };
 
   return (

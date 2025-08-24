@@ -44,7 +44,6 @@ export async function POST(request: NextRequest) {
     // Send email
     const info = await transporter.sendMail(mailOptions);
     
-    console.log(`Email sent successfully to ${to}:`, info.messageId);
     
     return NextResponse.json({
       success: true,

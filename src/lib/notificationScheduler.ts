@@ -14,7 +14,6 @@ export class NotificationScheduler {
 
   // Start the scheduler
   start(): void {
-    console.log('Starting notification scheduler...');
     
     // Check for overdue timesheets every hour
     this.scheduleHourlyCheck();
@@ -31,7 +30,6 @@ export class NotificationScheduler {
 
   // Stop the scheduler
   stop(): void {
-    console.log('Stopping notification scheduler...');
     this.intervals.forEach(interval => clearInterval(interval));
     this.intervals.clear();
   }
@@ -112,7 +110,6 @@ export class NotificationScheduler {
         );
       });
 
-      console.log(`Sent ${overdueEmployees.length} overdue timesheet notifications`);
     } catch (error) {
       console.error('Error checking overdue timesheets:', error);
     }
@@ -141,7 +138,6 @@ export class NotificationScheduler {
         );
       });
 
-      console.log(`Sent ${managersWithPending.length} pending approval reminders`);
     } catch (error) {
       console.error('Error checking pending approvals:', error);
     }
@@ -187,7 +183,6 @@ export class NotificationScheduler {
         }
       });
 
-      console.log(`Sent ${upcomingDeadlines.length} deadline reminders`);
     } catch (error) {
       console.error('Error checking upcoming deadlines:', error);
     }
@@ -217,7 +212,6 @@ export class NotificationScheduler {
           );
         });
 
-        console.log(`Sent ${employees.length} payroll cutoff reminders`);
       }
     } catch (error) {
       console.error('Error checking payroll cutoff:', error);
@@ -235,7 +229,6 @@ export class NotificationScheduler {
       
       if (isQuietHours) {
         // Only send critical notifications during quiet hours
-        console.log('Currently in quiet hours - only critical notifications will be sent');
       }
     } catch (error) {
       console.error('Error checking quiet hours compliance:', error);

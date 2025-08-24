@@ -259,10 +259,8 @@ export default function ExpensesPage() {
     if (action === 'review') {
       router.push(`/manager/approvals?employee=${expense.employeeId}&type=expense`)
     } else if (action === 'approve') {
-      console.log(`Approving expense ${expense.id}`)
       // In real app, this would make API call
     } else if (action === 'reject') {
-      console.log(`Rejecting expense ${expense.id}`)
       // In real app, this would make API call
     }
   }
@@ -428,7 +426,6 @@ export default function ExpensesPage() {
           </h2>
           <div className="flex space-x-2">
             <button 
-              onClick={() => console.log('Export all expenses')}
               className="bg-[#05202E] text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-[#0a2f3f] transition-colors flex items-center"
             >
               <Download className="w-4 h-4 mr-2" />

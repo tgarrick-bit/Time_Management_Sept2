@@ -39,7 +39,6 @@ export default function TestNotificationsPage() {
       }
     );
 
-    console.log('Test notification created:', notification);
   };
 
   // Test email configuration
@@ -136,7 +135,6 @@ export default function TestNotificationsPage() {
       });
 
       const result = await response.json();
-      console.log('Bulk notification result:', result);
       alert(`Bulk notification sent to ${result.results.successful.length} users successfully!`);
     } catch (error) {
       console.error('Failed to send bulk notifications:', error);
@@ -174,7 +172,6 @@ export default function TestNotificationsPage() {
       }
     );
 
-    console.log('Cross-check notifications created');
   };
 
   return (

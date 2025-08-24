@@ -57,7 +57,6 @@ export async function POST(req: Request) {
           });
 
           if (emailResponse.ok) {
-            console.log('Email notification sent successfully for timesheet approval');
           } else {
             console.warn('Failed to send email notification for timesheet approval');
           }

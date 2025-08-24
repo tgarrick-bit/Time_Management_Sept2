@@ -52,7 +52,6 @@ export default function ClientManagement() {
     try {
       setLoading(true)
       setError(null)
-      console.log('🔍 Fetching clients from database...')
       
       // Check if Supabase is properly configured
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -74,7 +73,6 @@ export default function ClientManagement() {
         return
       }
       
-      console.log('✅ Clients fetched successfully from database:', data?.length || 0, 'clients')
       setClients(data || [])
     } catch (error) {
       console.error('❌ Error fetching clients:', error)
@@ -146,7 +144,6 @@ export default function ClientManagement() {
     ]
     
     setClients(demoClients)
-    console.log('✅ Demo clients loaded:', demoClients.length, 'clients')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,7 +161,6 @@ export default function ClientManagement() {
               ? { ...client, ...formData, updated_at: new Date().toISOString() }
               : client
           ))
-          console.log('✅ Demo client updated successfully')
         } else {
           // Update in database
           // Check if Supabase is properly configured
@@ -175,7 +171,6 @@ export default function ClientManagement() {
                 ? { ...client, ...formData, updated_at: new Date().toISOString() }
                 : client
             ))
-            console.log('✅ Demo client updated successfully')
           } else {
             const { error } = await supabase
               .from('clients')
@@ -194,7 +189,6 @@ export default function ClientManagement() {
               console.error('❌ Database update error:', error)
               throw new Error(error.message)
             }
-            console.log('✅ Client updated in database successfully')
             
             // Refresh the clients list
             await fetchClients()
@@ -211,7 +205,6 @@ export default function ClientManagement() {
           is_active: formData.is_active
         }
         
-        console.log('🚀 Attempting to create client:', newClientData)
         
         // Check if Supabase is properly configured
         if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -223,7 +216,6 @@ export default function ClientManagement() {
             updated_at: new Date().toISOString()
           }
           setClients(prev => [...prev, demoClient])
-          console.log('✅ Demo client created successfully')
         } else {
           const { data, error } = await supabase
             .from('clients')
@@ -235,7 +227,6 @@ export default function ClientManagement() {
             throw new Error(error.message)
           }
           
-          console.log('✅ Client created in database successfully:', data)
           
           // Refresh the clients list
           await fetchClients()
@@ -273,14 +264,12 @@ export default function ClientManagement() {
       if (clientId.startsWith('demo-')) {
         // Delete demo client from local state
         setClients(prev => prev.filter(client => client.id !== clientId))
-        console.log('✅ Demo client deleted successfully')
       } else {
         // Delete from database
         // Check if Supabase is properly configured
         if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
           console.warn('⚠️ Supabase not configured, deleting demo client')
           setClients(prev => prev.filter(client => client.id !== clientId))
-          console.log('✅ Demo client deleted successfully')
         } else {
           const { error } = await supabase
             .from('clients')
@@ -291,7 +280,6 @@ export default function ClientManagement() {
             console.error('❌ Database delete error:', error)
             throw new Error(error.message)
           }
-          console.log('✅ Client deleted from database successfully')
           
           // Refresh the clients list
           await fetchClients()
@@ -346,10 +334,7 @@ export default function ClientManagement() {
         </div>
         <button
           onClick={() => {
-            console.log('Add Client button clicked!')
-            console.log('Current showForm state:', showForm)
             setShowForm(true)
-            console.log('Setting showForm to true')
           }}
           className="flex items-center px-4 py-2 bg-[#e31c79] text-white rounded-lg hover:bg-[#d4156a] transition-colors"
         >

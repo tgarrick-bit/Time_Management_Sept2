@@ -45,7 +45,6 @@ export default function AdminTimesheetManagement() {
   const fetchTimesheets = async () => {
     try {
       setLoading(true)
-      console.log('🔍 Fetching timesheets from database...')
       
       // For now, we'll use mock data since the database might not be fully set up
       // In production, this would fetch from the timesheets table with joins
@@ -102,7 +101,6 @@ export default function AdminTimesheetManagement() {
       ]
       
       setTimesheets(mockTimesheets)
-      console.log('✅ Timesheets loaded:', mockTimesheets.length)
     } catch (error) {
       console.error('❌ Error fetching timesheets:', error)
       setTimesheets([])
@@ -113,7 +111,6 @@ export default function AdminTimesheetManagement() {
 
   const handleApprove = async (timesheetId: string) => {
     try {
-      console.log('✅ Approving timesheet:', timesheetId)
       // In production, this would update the database
       setTimesheets(prev => prev.map(ts => 
         ts.id === timesheetId 
@@ -127,7 +124,6 @@ export default function AdminTimesheetManagement() {
 
   const handleReject = async (timesheetId: string, reason: string) => {
     try {
-      console.log('❌ Rejecting timesheet:', timesheetId, 'Reason:', reason)
       // In production, this would update the database
       setTimesheets(prev => prev.map(ts => 
         ts.id === timesheetId 
@@ -169,7 +165,6 @@ export default function AdminTimesheetManagement() {
   })
 
   const exportTimesheets = () => {
-    console.log('📊 Exporting timesheets...')
     // In production, this would generate and download a CSV/Excel file
   }
 

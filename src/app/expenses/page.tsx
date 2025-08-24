@@ -453,13 +453,11 @@ export default function ExpensesPage() {
     if (file) {
       setReceiptFile(file);
       // In a real app, you'd upload to cloud storage here
-      console.log('Receipt uploaded:', file.name);
     }
   };
 
   const handleReceiptCapture = () => {
     // In a real app, this would open camera
-    console.log('Opening camera for receipt capture...');
   };
 
   const getStatusBadge = (status: string) => {

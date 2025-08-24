@@ -69,7 +69,6 @@ export default function EmployeeImportPage() {
     // Preview the data
     try {
       const preview = await parseExcelFile(selectedFile, true); // Preview mode
-      console.log('Preview data:', preview); // Debug logging
       
       // For West End Workers report, preview from row 7 onwards
       const employeePreview = preview.employees.slice(0, 5); // Show first 5 employee records
@@ -205,8 +204,6 @@ export default function EmployeeImportPage() {
 
   const mapEmployeeData = (rowData: EmployeeData): ProcessedEmployee => {
     // Debug logging to see what columns are available
-    console.log('Mapping employee data:', rowData);
-    console.log('Available columns:', Object.keys(rowData));
     
     // Map West End Workers Excel columns to employee fields
     const firstName = rowData['First Name'] || '';
@@ -217,7 +214,6 @@ export default function EmployeeImportPage() {
     const customerPath = rowData['Default Customer Full Path'] || '';
     const department = extractDepartment(customerPath);
     
-    console.log('Mapped values:', { firstName, lastName, fullName, customerPath, department });
     
     return {
       id: rowData['Employee Id'] || generateEmployeeId(),
@@ -344,7 +340,6 @@ export default function EmployeeImportPage() {
 
   const saveEmployee = async (employee: ProcessedEmployee): Promise<void> => {
     // In real implementation, save to database via API
-    console.log('Saving employee:', employee);
     // await fetch('/api/employees', { method: 'POST', body: JSON.stringify(employee) });
   };
 

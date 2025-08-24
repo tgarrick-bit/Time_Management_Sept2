@@ -355,7 +355,6 @@ export class NotificationService {
 
         if (response.ok) {
           notification.isEmailSent = true;
-          console.log(`Email notification sent successfully to ${userEmail}`);
         } else {
           console.warn(`Failed to send email notification to ${userEmail}`);
         }

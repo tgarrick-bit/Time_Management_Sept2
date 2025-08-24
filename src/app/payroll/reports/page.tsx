@@ -41,7 +41,6 @@ export default function PayrollReportsPage() {
 
   const handleExport = (type: 'payroll' | 'timesheets' | 'expenses' | 'summary') => {
     // In a real app, this would generate and download the report
-    console.log(`Exporting ${type} report...`);
     alert(`${type} report exported successfully!`);
   };
 

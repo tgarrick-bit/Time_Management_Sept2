@@ -168,7 +168,6 @@ export default function AdminSettingsPage() {
   }
 
   const handleSaveAllSettings = () => {
-    console.log('Saving all settings:', settings)
     alert('All settings have been saved successfully!')
   }
 
@@ -193,18 +192,15 @@ export default function AdminSettingsPage() {
   }
 
   const createBackup = () => {
-    console.log('Creating backup...')
     alert('Backup creation started. You will be notified when complete.')
   }
 
   const downloadBackup = (backup: BackupRecord) => {
-    console.log('Downloading backup:', backup)
     alert(`Downloading backup from ${backup.date}`)
   }
 
   const deleteBackup = (backup: BackupRecord) => {
     if (confirm('Are you sure you want to delete this backup?')) {
-      console.log('Deleting backup:', backup)
       alert('Backup deleted successfully')
     }
   }

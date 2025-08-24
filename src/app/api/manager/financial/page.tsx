@@ -84,7 +84,6 @@ export default function ManagerFinancialPage() {
 
   const handleExport = (type: string) => {
     // In a real app, this would export the data
-    console.log(`Exporting ${type} data`)
     alert(`Exporting ${type} data`)
   }
 

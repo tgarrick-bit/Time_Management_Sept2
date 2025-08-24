@@ -41,7 +41,6 @@ export default function ReportsPage() {
 
   const handleExport = (type: 'summary' | 'detailed' | 'monthly') => {
     // In a real app, this would generate and download the report
-    console.log(`Exporting ${type} report...`);
     alert(`${type} report exported successfully!`);
   };
 

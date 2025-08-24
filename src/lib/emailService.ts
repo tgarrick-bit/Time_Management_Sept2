@@ -53,7 +53,6 @@ export class EmailService {
     // On client side, just mark as initialized
     if (typeof window !== 'undefined') {
       this.isInitialized = true;
-      console.log('Email service initialized (client mode)');
       return;
     }
 
@@ -80,7 +79,6 @@ export class EmailService {
       await transporter.verify();
       
       this.isInitialized = true;
-      console.log('Email service initialized successfully with SMTP');
     } catch (error) {
       console.error('Failed to initialize email service:', error);
       this.isInitialized = false;
@@ -103,7 +101,6 @@ export class EmailService {
       
       // On client side, just log the email
       if (typeof window !== 'undefined') {
-        console.log('Email would be sent (client mode):', {
           to: toEmail,
           subject: template.subject,
           from: `${this.config.fromName} <${this.config.fromEmail}>`
@@ -126,7 +123,6 @@ export class EmailService {
         });
 
         if (response.ok) {
-          console.log(`Email sent successfully to ${toEmail}: ${template.subject}`);
           return true;
         } else {
           console.error('Failed to send email via API');

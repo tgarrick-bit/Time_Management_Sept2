@@ -219,7 +219,6 @@ export default function ReportsPage() {
   }
 
   const handleExport = (reportType: string) => {
-    console.log(`Exporting ${reportType} as ${exportFormat}`)
     // In real app, this would generate and download the report
   }
 

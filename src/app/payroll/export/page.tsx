@@ -105,7 +105,6 @@ export default function PayrollExportPage() {
     }
     
     // In a real app, this would generate and download the export
-    console.log(`Exporting ${type} data:`, dataToExport);
     alert(`${type} export completed successfully!`);
   };
 

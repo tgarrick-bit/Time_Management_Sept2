@@ -167,7 +167,6 @@ export default function AdminClientsPage() {
 
   const handleDeleteClient = (clientId: string) => {
     if (confirm('Are you sure you want to delete this client? This action cannot be undone.')) {
-      console.log('Deleting client:', clientId)
       // Implement actual deletion logic here
     }
   }
@@ -184,7 +183,6 @@ export default function AdminClientsPage() {
 
   const handleDeleteProject = (projectId: string) => {
     if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-      console.log('Deleting project:', projectId)
       // Implement actual deletion logic here
     }
   }
