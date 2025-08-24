@@ -1,5 +1,4 @@
 {
-  "buildCommand": "npm ci && npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm ci"
+  "installCommand": "npm install --no-package-lock",
+  "buildCommand": "npm run build"
 }
