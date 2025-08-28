@@ -1,9 +1,8 @@
 'use client';
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, Building2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -12,255 +11,366 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
   const { login } = useAuth();
   const router = useRouter();
 
   const quickLoginOptions = [
     {
       role: 'Employee',
-      icon: 'E',
-      color: 'from-pink-500 to-pink-600',
-      description: 'Access timesheet and expense submission',
+      description: 'Access timesheets, expenses, and profile',
       email: 'employee@westendworkforce.com',
-      password: 'employee123'
+      password: 'employee123',
+      gradient: 'linear-gradient(135deg, #e31c79, #c41866)'
     },
     {
       role: 'Manager',
-      icon: 'M',
-      color: 'from-blue-500 to-blue-600',
       description: 'Review and approve team submissions',
       email: 'manager@westendworkforce.com',
-      password: 'manager123'
+      password: 'manager123',
+      gradient: 'linear-gradient(135deg, #05202e, #0a2f42)'
     },
     {
       role: 'Admin',
-      icon: 'A',
-      color: 'from-purple-500 to-purple-600',
       description: 'Full system administration access',
       email: 'admin@westendworkforce.com',
-      password: 'admin123'
+      password: 'admin123',
+      gradient: 'linear-gradient(135deg, #232020, #05202e)'
     }
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading) return;
-    
     setIsLoading(true);
     setError('');
 
-    const result = await login(email, password);
-    
-    if (result.success && result.user) {
-      // Redirect based on user role
-      switch (result.user.role) {
-        case 'admin':
-          router.push('/admin');
-          break;
-        case 'manager':
-          router.push('/manager');
-          break;
-        case 'employee':
-          router.push('/employee');
-          break;
-        default:
-          router.push('/dashboard');
+    try {
+      const result = await login(email, password);
+      
+      if (result.success) {
+        switch (result.user?.role) {
+          case 'admin':
+            router.push('/admin');
+            break;
+          case 'manager':
+            router.push('/manager');
+            break;
+          case 'employee':
+            router.push('/employee');
+            break;
+          default:
+            router.push('/employee');
+        }
+      } else {
+        setError(result.error || 'Invalid credentials');
       }
-    } else {
-      setError(result.error || 'Login failed');
+    } catch (err) {
+      setError('Login failed. Please try again.');
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleQuickLogin = async (option: any) => {
+  const handleQuickLogin = (option: any) => {
     setEmail(option.email);
     setPassword(option.password);
-    setIsLoading(true);
     setError('');
-
-    const result = await login(option.email, option.password);
-    
-    if (result.success && result.user) {
-      switch (result.user.role) {
-        case 'admin':
-          router.push('/admin');
-          break;
-        case 'manager':
-          router.push('/manager');
-          break;
-        case 'employee':
-          router.push('/employee');
-          break;
-        default:
-          router.push('/dashboard');
-      }
-    } else {
-      setError(result.error || 'Login failed');
-      setIsLoading(false);
-    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center">
+    <div style={{
+      minHeight: '100vh',
+      background: '#ffffff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem 1rem'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '1400px',
+        display: 'grid',
+        gridTemplateColumns: 'minmax(400px, 1fr) minmax(450px, 600px)',
+        gap: '3rem',
+        alignItems: 'center'
+      }}>
         
-        {/* Left Side - Branding */}
-        <div className="text-center lg:text-left">
-          <div className="mb-8">
-            <img 
-              src="/WE-logo-SEPT2024v3.png" 
-              alt="West End Workforce Logo" 
-              className="h-20 w-auto mx-auto lg:mx-0 mb-6"
-            />
-            <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-              West End Workforce
-            </h1>
-            <p className="text-xl text-gray-600 mb-6">
-              Timesheet & Expense Management System
-            </p>
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Features</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
-                  <span className="text-gray-700">Digital timesheet management</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-gray-700">Expense tracking & approval</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                  <span className="text-gray-700">Real-time reporting dashboard</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-700">Client & contractor management</span>
-                </div>
-              </div>
+        {/* Login Form */}
+        <div style={{
+          background: '#ffffff',
+          border: '1px solid #f1f5f9',
+          borderRadius: '1.5rem',
+          padding: '3rem',
+          maxWidth: '480px',
+          width: '100%'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <Building2 style={{ width: '2rem', height: '2rem', color: '#e31c79' }} />
+              <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#232020', margin: 0 }}>
+                West End Workforce
+              </h1>
             </div>
-          </div>
-        </div>
-
-        {/* Right Side - Login Forms */}
-        <div className="space-y-8">
-          
-          {/* Login Form */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Sign In</h2>
-              <p className="text-gray-600">Access your workspace</p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
-                    placeholder="Enter your email"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
-                    placeholder="Enter your password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-sm text-red-600">{error}</p>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-semibold py-3 px-4 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Signing in...' : 'Sign In'}
-              </button>
-            </form>
+            <h2 style={{ fontSize: '1.875rem', fontWeight: '700', color: '#232020', marginBottom: '0.5rem' }}>
+              Welcome back
+            </h2>
+            <p style={{ color: '#6b7280' }}>Sign in to your account to continue</p>
           </div>
 
-          {/* Quick Login Options */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Demo Access</h3>
-            <p className="text-gray-600 mb-6">Quick login options for testing different user roles:</p>
-            
-            <div className="space-y-4">
-              {quickLoginOptions.map((option, index) => (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div>
+              <label style={{ fontSize: '0.875rem', fontWeight: '500', color: '#232020', display: 'block', marginBottom: '0.5rem' }}>
+                Email Address
+              </label>
+              <div style={{ position: 'relative' }}>
+                <div style={{
+                  position: 'absolute',
+                  left: '1rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                  zIndex: 1
+                }}>
+                  <Mail style={{ width: '1.25rem', height: '1.25rem' }} />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  required
+                  style={{
+                    width: '100%',
+                    paddingTop: '0.75rem',
+                    paddingBottom: '0.75rem',
+                    paddingLeft: '3rem',
+                    paddingRight: '1rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '1rem',
+                    transition: 'all 0.2s',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#e31c79';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(227, 28, 121, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.875rem', fontWeight: '500', color: '#232020', display: 'block', marginBottom: '0.5rem' }}>
+                Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <div style={{
+                  position: 'absolute',
+                  left: '1rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                  zIndex: 1
+                }}>
+                  <Lock style={{ width: '1.25rem', height: '1.25rem' }} />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  style={{
+                    width: '100%',
+                    paddingTop: '0.75rem',
+                    paddingBottom: '0.75rem',
+                    paddingLeft: '3rem',
+                    paddingRight: '3rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '1rem',
+                    transition: 'all 0.2s',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#e31c79';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(227, 28, 121, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
                 <button
-                  key={index}
-                  onClick={() => handleQuickLogin(option)}
-                  disabled={isLoading}
-                  className="w-full text-left p-4 border-2 border-gray-200 rounded-lg hover:border-pink-300 hover:shadow-md transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#9ca3af',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    zIndex: 1
+                  }}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 bg-gradient-to-r ${option.color} rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
-                      {option.icon}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
-                        {option.role}
-                      </h4>
-                      <p className="text-sm text-gray-500">{option.description}</p>
-                      <p className="text-xs text-gray-400 mt-1">{option.email}</p>
-                    </div>
-                  </div>
+                  {showPassword ? <EyeOff style={{ width: '1.25rem', height: '1.25rem' }} /> : <Eye style={{ width: '1.25rem', height: '1.25rem' }} />}
                 </button>
-              ))}
+              </div>
             </div>
 
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">
-                <strong>Note:</strong> Click any option above to auto-fill credentials, then click "Sign In" to access that role's dashboard.
-              </p>
-            </div>
-          </div>
+            {error && (
+              <div style={{
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '0.5rem',
+                padding: '0.75rem'
+              }}>
+                <p style={{ fontSize: '0.875rem', color: '#dc2626' }}>{error}</p>
+              </div>
+            )}
 
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                paddingTop: '0.75rem',
+                paddingBottom: '0.75rem',
+                paddingLeft: '1rem',
+                paddingRight: '1rem',
+                borderRadius: '0.5rem',
+                fontWeight: '500',
+                border: 'none',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                background: isLoading ? '#d1d5db' : 'linear-gradient(to right, #e31c79, #c41866)',
+                color: isLoading ? '#6b7280' : '#ffffff',
+                fontSize: '1rem',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => {
+                if (!isLoading) {
+                  (e.target as HTMLButtonElement).style.background = 'linear-gradient(to right, #c41866, #b01558)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!isLoading) {
+                  (e.target as HTMLButtonElement).style.background = 'linear-gradient(to right, #e31c79, #c41866)';
+                }
+              }}
+            >
+              {isLoading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
         </div>
 
-        {/* Footer */}
-        <div className="lg:col-span-2 text-center mt-8">
-          <p className="text-sm text-gray-500 mb-2">
-            © 2025 West End Workforce. Professional timesheet and expense management.
+        {/* Quick Login Options */}
+        <div style={{
+          background: '#05202e',
+          borderRadius: '1.5rem',
+          padding: '3rem',
+          maxWidth: '500px',
+          width: '100%'
+        }}>
+          <h3 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#ffffff', marginBottom: '0.5rem' }}>
+            Demo Access
+          </h3>
+          <p style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '2rem' }}>
+            Quick login with pre-filled credentials
           </p>
-          <Link 
-            href="/dashboard"
-            className="text-sm text-pink-600 hover:text-pink-700 underline"
-          >
-            View Platform Features
-          </Link>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {quickLoginOptions.map((option, index) => (
+              <button
+                key={index}
+                onClick={() => handleQuickLogin(option)}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '1.25rem',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  backdropFilter: 'blur(10px)'
+                }}
+                onMouseOver={(e) => {
+                  (e.target as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.25)';
+                  (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  (e.target as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.15)';
+                  (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{
+                    width: '3rem',
+                    height: '3rem',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    borderRadius: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <span style={{ color: '#ffffff', fontWeight: '700', fontSize: '1.125rem' }}>
+                      {option.role[0]}
+                    </span>
+                  </div>
+                  <div style={{ flex: '1', minWidth: 0 }}>
+                    <h4 style={{ fontWeight: '600', color: '#ffffff', marginBottom: '0.25rem', fontSize: '1.125rem' }}>
+                      {option.role}
+                    </h4>
+                    <p style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '0.25rem' }}>
+                      {option.description}
+                    </p>
+                    <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.6)' }}>
+                      {option.email}
+                    </p>
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div style={{
+            marginTop: '2rem',
+            padding: '1rem',
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '0.75rem',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ffffff', marginBottom: '0.5rem' }}>
+              Demo Features
+            </h4>
+            <ul style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)', listStyle: 'none', padding: 0, margin: 0 }}>
+              <li style={{ marginBottom: '0.25rem' }}>• Full access to all system features</li>
+              <li style={{ marginBottom: '0.25rem' }}>• Sample data and workflows</li>
+              <li style={{ marginBottom: '0.25rem' }}>• No risk to production data</li>
+              <li>• Perfect for training and demos</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
