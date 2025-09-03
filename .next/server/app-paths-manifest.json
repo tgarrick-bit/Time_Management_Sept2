@@ -1,7 +1,0 @@
-{
-  "/expense/entry/page": "app/expense/entry/page.js",
-  "/manager/page": "app/manager/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/admin/employees/page": "app/admin/employees/page.js",
-  "/admin/timesheets/page": "app/admin/timesheets/page.js"
-}
