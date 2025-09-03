@@ -47,13 +47,41 @@ export interface ClientFormData {
   is_active: boolean;
 }
 
-// Define Project interface
+// Define Project interface - COMPLETE VERSION
 export interface Project {
   id: string;
   name: string;
   code?: string;
-  client_id?: string;
-  status: string;
+  client_id: string;  // Required for ProjectManagement component
+  description?: string;
+  start_date: string;
+  end_date?: string | null;
+  budget?: number | null;
+  status: 'active' | 'completed' | 'on-hold';
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Define User interface
+export interface User {
+  id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  role: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Define ProjectAssignment interface
+export interface ProjectAssignment {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role?: string;
+  is_active: boolean;
   created_at?: string;
   updated_at?: string;
 }

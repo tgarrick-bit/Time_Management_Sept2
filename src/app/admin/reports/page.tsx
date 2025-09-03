@@ -174,7 +174,7 @@ export default function ReportsPage() {
     setLoading(true);
     try {
       // Using timesheets table instead of timecards
-      let query = supabase
+      const query = supabase
         .from('timesheets')
         .select(`
           *,

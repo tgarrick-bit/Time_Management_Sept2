@@ -305,23 +305,13 @@ export default function ProjectManagement() {
             updated_at: new Date().toISOString()
           })
           .eq('id', editingProject.id)
-
+        
         if (error) {
           console.error('❌ Error updating project:', error)
           throw error
         }
       } else {
         // Create new project
-          name: formData.name,
-          client_id: formData.client_id,
-          description: formData.description,
-          start_date: formData.start_date,
-          end_date: formData.end_date || null,
-          budget: formData.budget || null,
-          status: formData.status,
-          is_active: formData.is_active
-        })
-        
         const { data, error } = await supabase
           .from('projects')
           .insert([{
@@ -354,7 +344,6 @@ export default function ProjectManagement() {
           console.error('❌ Detailed error for user:', detailedError)
           throw new Error(detailedError)
         }
-        
       }
 
       // Reset form and refresh data
