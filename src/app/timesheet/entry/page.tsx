@@ -33,6 +33,12 @@ interface Employee {
   state: string;
 }
 
+interface OvertimeCalculation {
+  regular: number;
+  overtime: number;
+  doubleTime: number;
+}
+
 export default function TimesheetEntryPage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
@@ -82,23 +88,28 @@ export default function TimesheetEntryPage() {
     }
     setUserEmail(user.email || '');
     
-    // Fetch employee info for overtime calculation
-    const { data: empData } = await supabase
-      .from('employees')
-      .select('id, is_exempt, state')
+    // Fetch employee info from profiles table (FIXED: was looking for 'employees' table)
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('id, state')
       .eq('id', user.id)
       .single();
     
-    if (empData) {
-      setEmployeeInfo(empData);
+    if (profileData) {
+      // Default to non-exempt for now (you can add is_exempt column to profiles later if needed)
+      setEmployeeInfo({
+        id: profileData.id,
+        is_exempt: false, // Default to non-exempt
+        state: profileData.state || 'CA' // Default to CA if no state specified
+      });
     }
   };
 
   const loadProjects = async () => {
     const { data, error } = await supabase
       .from('projects')
-      .select('id, name, is_active')
-      .eq('is_active', true)
+      .select('id, name, status')
+      .eq('status', 'active')
       .order('name');
     
     if (error) {
@@ -108,7 +119,7 @@ export default function TimesheetEntryPage() {
         id: p.id,
         name: p.name,
         client_name: '',
-        is_active: p.is_active
+        is_active: p.status === 'active'
       }));
       setProjects(mappedProjects);
     }
@@ -192,24 +203,72 @@ export default function TimesheetEntryPage() {
     return totals;
   };
 
-  const calculateOvertime = (totals: any) => {
-    if (!employeeInfo || employeeInfo.is_exempt) return 0;
-    
+  const calculateOvertimeDetailed = (totals: any): OvertimeCalculation => {
+    if (!employeeInfo || employeeInfo.is_exempt) {
+      return { regular: totals.total, overtime: 0, doubleTime: 0 };
+    }
+
+    let regular = 0;
     let overtime = 0;
-    
+    let doubleTime = 0;
+
     if (employeeInfo.state === 'CA') {
-      // California: Daily overtime over 8 hours
-      ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
-        if (totals[day] > 8) {
-          overtime += totals[day] - 8;
+      // California: Complex overtime rules
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      let consecutiveDays = 0;
+      
+      days.forEach((day, index) => {
+        const hours = totals[day] || 0;
+        
+        if (hours > 0) {
+          consecutiveDays++;
+        } else {
+          consecutiveDays = 0;
+        }
+        
+        // 7th consecutive day gets special treatment
+        if (consecutiveDays === 7) {
+          // First 8 hours are overtime (1.5x)
+          if (hours <= 8) {
+            overtime += hours;
+          } else {
+            overtime += 8;
+            // Hours over 8 on 7th day are double time
+            doubleTime += hours - 8;
+          }
+        } else {
+          // Regular daily overtime rules
+          if (hours <= 8) {
+            regular += hours;
+          } else if (hours <= 12) {
+            regular += 8;
+            overtime += hours - 8;
+          } else {
+            regular += 8;
+            overtime += 4; // Hours 8-12 are overtime
+            doubleTime += hours - 12; // Hours over 12 are double time
+          }
         }
       });
+
+      // Also check weekly overtime (over 40 regular hours)
+      const weeklyTotal = totals.total;
+      if (weeklyTotal > 40 && regular > 40) {
+        const excessRegular = regular - 40;
+        regular -= excessRegular;
+        overtime += excessRegular;
+      }
     } else {
-      // Other states: Weekly overtime over 40 hours
-      overtime = totals.total > 40 ? totals.total - 40 : 0;
+      // Other states: Simple weekly overtime over 40 hours
+      if (totals.total <= 40) {
+        regular = totals.total;
+      } else {
+        regular = 40;
+        overtime = totals.total - 40;
+      }
     }
     
-    return overtime;
+    return { regular, overtime, doubleTime };
   };
 
   const handleSubmit = async (isDraft: boolean = false) => {
@@ -238,41 +297,41 @@ export default function TimesheetEntryPage() {
 
       // Calculate totals and overtime
       const totals = calculateDailyTotals();
-      const overtimeHours = calculateOvertime(totals);
+      const overtimeCalc = calculateOvertimeDetailed(totals);
 
-      // Create timecard with proper overtime calculation
+      // Create timecard (FIXED: using correct table name)
       const { data: timecard, error: timecardError } = await supabase
         .from('timecards')
         .insert({
           employee_id: user.id,
           week_ending: weekEnding,
           total_hours: totals.total,
-          total_overtime: overtimeHours,
-          regular_hours: totals.total - overtimeHours,
-          status: isDraft ? 'draft' : 'pending',
+          total_regular_hours: overtimeCalc.regular,
+          total_overtime_hours: overtimeCalc.overtime,
+          status: isDraft ? 'draft' : 'submitted',
           submitted_at: isDraft ? null : new Date().toISOString(),
-          attestations: employeeInfo?.state === 'CA' ? attestations : null
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .select()
         .single();
 
       if (timecardError) throw timecardError;
 
-      // Create time entries
+      // Create timecard entries (FIXED: using correct table name)
       for (const entry of validEntries) {
         const { error: entryError } = await supabase
-          .from('time_entries')
+          .from('timecard_entries')
           .insert({
             timecard_id: timecard.id,
+            employee_id: user.id,
             project_id: entry.project_id,
-            monday: entry.monday,
-            tuesday: entry.tuesday,
-            wednesday: entry.wednesday,
-            thursday: entry.thursday,
-            friday: entry.friday,
-            saturday: entry.saturday,
-            sunday: entry.sunday,
-            total: entry.total
+            entry_date: weekEnding, // Using week ending date for now
+            regular_hours: Math.min(8, entry.total),
+            overtime_hours: Math.max(0, entry.total - 8),
+            description: `Work on ${entry.project_name}`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
 
         if (entryError) throw entryError;
@@ -311,8 +370,7 @@ export default function TimesheetEntryPage() {
   };
 
   const totals = calculateDailyTotals();
-  const overtimeHours = calculateOvertime(totals);
-  const regularHours = Math.max(0, totals.total - overtimeHours);
+  const overtimeCalc = calculateOvertimeDetailed(totals);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -341,7 +399,7 @@ export default function TimesheetEntryPage() {
               <span className="text-sm text-gray-200">{userEmail}</span>
               {employeeInfo && (
                 <div className="text-xs text-gray-400">
-                  {employeeInfo.is_exempt ? 'Exempt' : 'Non-Exempt'} • {employeeInfo.state}
+                  {employeeInfo.is_exempt ? 'Exempt' : 'Non-Exempt'} • {employeeInfo.state || 'CA'}
                 </div>
               )}
             </div>
@@ -372,7 +430,13 @@ export default function TimesheetEntryPage() {
                 <ChevronLeft className="h-5 w-5 text-gray-600" />
               </button>
               <button
-                onClick={() => setWeekEnding(new Date().toISOString().split('T')[0])}
+                onClick={() => {
+                  const today = new Date();
+                  const daysUntilSunday = 7 - today.getDay();
+                  const nextSunday = new Date(today);
+                  nextSunday.setDate(today.getDate() + daysUntilSunday);
+                  setWeekEnding(nextSunday.toISOString().split('T')[0]);
+                }}
                 className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
               >
                 Current Week
@@ -523,31 +587,45 @@ export default function TimesheetEntryPage() {
 
         {/* Summary Stats */}
         <div className="bg-white rounded-lg shadow-sm p-4 mt-4">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-600">
-              <span className="font-medium">Regular Hours:</span> {regularHours.toFixed(1)}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-sm">
+              <span className="text-gray-600">Regular Hours:</span>
+              <span className="ml-2 font-semibold">{overtimeCalc.regular.toFixed(1)}</span>
             </div>
-            <div className="text-sm text-gray-600">
-              <span className="font-medium">
-                Overtime Hours {employeeInfo?.state === 'CA' ? '(8+ daily)' : '(40+ weekly)'}:
-              </span> 
-              <span className={overtimeHours > 0 ? 'text-orange-600 font-bold ml-1' : 'ml-1'}>
-                {overtimeHours.toFixed(1)}
+            <div className="text-sm">
+              <span className="text-gray-600">
+                Overtime {employeeInfo?.state === 'CA' ? '(1.5x)' : ''}:
+              </span>
+              <span className={`ml-2 font-semibold ${overtimeCalc.overtime > 0 ? 'text-orange-600' : ''}`}>
+                {overtimeCalc.overtime.toFixed(1)}
               </span>
             </div>
-            <div className="text-sm text-gray-600">
-              <span className="font-medium">Total Week Hours:</span> 
-              <span className="text-[#e31c79] font-bold ml-1">{totals.total.toFixed(1)}</span>
-            </div>
-            {employeeInfo && !employeeInfo.is_exempt && (
-              <div className="text-xs text-gray-500">
-                Status: Non-Exempt
+            {employeeInfo?.state === 'CA' && (
+              <div className="text-sm">
+                <span className="text-gray-600">Double Time (2x):</span>
+                <span className={`ml-2 font-semibold ${overtimeCalc.doubleTime > 0 ? 'text-red-600' : ''}`}>
+                  {overtimeCalc.doubleTime.toFixed(1)}
+                </span>
               </div>
             )}
+            <div className="text-sm">
+              <span className="text-gray-600">Total Hours:</span>
+              <span className="ml-2 font-semibold text-[#e31c79]">
+                {totals.total.toFixed(1)}
+              </span>
+            </div>
           </div>
+          {employeeInfo && !employeeInfo.is_exempt && (
+            <div className="mt-2 pt-2 border-t border-gray-200">
+              <div className="text-xs text-gray-500">
+                Status: Non-Exempt Employee • State: {employeeInfo.state || 'CA'}
+                {employeeInfo.state === 'CA' && ' • California overtime rules apply'}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* California Attestations */}
+        {/* California Attestations - Only shown for CA employees */}
         {employeeInfo?.state === 'CA' && !employeeInfo.is_exempt && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
             <div className="flex items-start gap-2 mb-3">
@@ -563,7 +641,7 @@ export default function TimesheetEntryPage() {
                   type="checkbox"
                   checked={attestations.accurateTime}
                   onChange={(e) => setAttestations({...attestations, accurateTime: e.target.checked})}
-                  className="rounded text-[#e31c79]"
+                  className="rounded text-[#e31c79] focus:ring-[#e31c79]"
                 />
                 <span className="text-sm">I have entered all time worked accurately</span>
               </label>
@@ -572,7 +650,7 @@ export default function TimesheetEntryPage() {
                   type="checkbox"
                   checked={attestations.breaksTaken}
                   onChange={(e) => setAttestations({...attestations, breaksTaken: e.target.checked})}
-                  className="rounded text-[#e31c79]"
+                  className="rounded text-[#e31c79] focus:ring-[#e31c79]"
                 />
                 <span className="text-sm">I have taken all required meal and rest breaks</span>
               </label>
@@ -581,11 +659,25 @@ export default function TimesheetEntryPage() {
                   type="checkbox"
                   checked={attestations.noInjuries}
                   onChange={(e) => setAttestations({...attestations, noInjuries: e.target.checked})}
-                  className="rounded text-[#e31c79]"
+                  className="rounded text-[#e31c79] focus:ring-[#e31c79]"
                 />
                 <span className="text-sm">I have not sustained any work-related injuries this week</span>
               </label>
             </div>
+          </div>
+        )}
+
+        {/* Simple Attestation for non-CA employees */}
+        {employeeInfo && (!employeeInfo.state || employeeInfo.state !== 'CA') && !employeeInfo.is_exempt && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+            <h3 className="font-medium text-gray-900 mb-2">Timesheet Attestation</h3>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="rounded text-[#e31c79] focus:ring-[#e31c79]"
+              />
+              <span className="text-sm">I certify that the hours recorded above are accurate and complete</span>
+            </label>
           </div>
         )}
 

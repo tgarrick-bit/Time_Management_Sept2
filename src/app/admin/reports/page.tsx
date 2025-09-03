@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { 
   FileText,
   Download,
@@ -17,7 +18,8 @@ import {
   ChevronRight,
   Printer,
   Mail,
-  FileSpreadsheet
+  FileSpreadsheet,
+  LogOut
 } from 'lucide-react';
 
 interface ReportType {
@@ -55,6 +57,7 @@ export default function ReportsPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('');
   const [reportSummary, setReportSummary] = useState({
     totalEmployees: 0,
     totalHours: 0,
@@ -113,6 +116,13 @@ export default function ReportsPage() {
   ];
 
   useEffect(() => {
+    // Get user email
+    const getUserEmail = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserEmail(user.email || '');
+    };
+    getUserEmail();
+
     // Set default date range (current pay period)
     const today = new Date();
     const sunday = new Date(today);
@@ -138,7 +148,7 @@ export default function ReportsPage() {
       const { data } = await supabase
         .from('clients')
         .select('id, name')
-        .eq('active', true);
+        .eq('is_active', true);
       
       setClients(data || []);
     } catch (error) {
@@ -163,28 +173,22 @@ export default function ReportsPage() {
   const generateReport = async () => {
     setLoading(true);
     try {
+      // Using timesheets table instead of timecards
       let query = supabase
-        .from('timecards')
+        .from('timesheets')
         .select(`
           *,
-          employee:employee_id (
+          employee:employees!employee_id (
             first_name,
             last_name,
-            employee_type,
             hourly_rate,
             department,
-            client:client_id (
-              name
-            )
+            client_id
           )
         `)
-        .gte('work_date', startDate)
-        .lte('work_date', endDate)
+        .gte('week_ending', startDate)
+        .lte('week_ending', endDate)
         .eq('status', 'approved');
-
-      if (selectedClient !== 'all') {
-        query = query.eq('employee.client_id', selectedClient);
-      }
 
       const { data, error } = await query;
 
@@ -194,15 +198,15 @@ export default function ReportsPage() {
       const processedData: PayrollData[] = [];
       const employeeTotals: { [key: string]: PayrollData } = {};
 
-      data?.forEach(timecard => {
-        const employeeId = timecard.employee_id;
-        const employee = timecard.employee;
+      data?.forEach(timesheet => {
+        const employeeId = timesheet.employee_id;
+        const employee = timesheet.employee;
         
         if (!employeeTotals[employeeId]) {
           employeeTotals[employeeId] = {
             employee_id: employeeId,
-            employee_name: `${employee.first_name} ${employee.last_name}`,
-            employee_type: employee.employee_type,
+            employee_name: `${employee.first_name || ''} ${employee.last_name || ''}`,
+            employee_type: 'W2', // Default, you may need to add this field to employees table
             regular_hours: 0,
             overtime_hours: 0,
             total_hours: 0,
@@ -210,16 +214,20 @@ export default function ReportsPage() {
             regular_pay: 0,
             overtime_pay: 0,
             total_pay: 0,
-            client: employee.client?.name || 'Unassigned',
+            client: 'Unassigned', // Will need to join with clients table
             department: employee.department || 'Unassigned',
             period_start: startDate,
             period_end: endDate
           };
         }
 
-        employeeTotals[employeeId].regular_hours += timecard.regular_hours || 0;
-        employeeTotals[employeeId].overtime_hours += timecard.overtime_hours || 0;
-        employeeTotals[employeeId].total_hours += timecard.total_hours || 0;
+        const totalHours = timesheet.total_hours || 0;
+        const regularHours = Math.min(totalHours, 40);
+        const overtimeHours = Math.max(0, totalHours - 40);
+
+        employeeTotals[employeeId].regular_hours += regularHours;
+        employeeTotals[employeeId].overtime_hours += overtimeHours;
+        employeeTotals[employeeId].total_hours += totalHours;
       });
 
       // Calculate pay
@@ -260,9 +268,12 @@ export default function ReportsPage() {
     }
   };
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/auth/login');
+  };
+
   const exportToExcel = () => {
-    // This would use a library like xlsx to export
-    // For now, we'll create a CSV
     const headers = [
       'Employee Name',
       'Employee Type',
@@ -305,7 +316,7 @@ export default function ReportsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-navy text-white">
+      <header className="shadow-lg" style={{ backgroundColor: '#33393c' }}>
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -313,19 +324,31 @@ export default function ReportsPage() {
                 onClick={() => router.push('/admin')}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-5 w-5 text-white" />
               </button>
-              <div>
-                <h1 className="text-2xl font-bold">Reports &amp; Export</h1>
-                <p className="text-sm text-gray-300">Generate reports and export data</p>
+              <Image 
+                src="/WE-logo-SEPT2024v3-WHT.png" 
+                alt="West End Workforce" 
+                width={150}
+                height={40}
+                className="h-10 w-auto"
+                priority
+              />
+              <div className="border-l border-gray-500 pl-3 ml-1">
+                <h1 className="text-xl font-semibold text-white">Reports &amp; Export</h1>
+                <p className="text-xs text-gray-300">Generate reports and export data</p>
               </div>
             </div>
-            <button 
-              onClick={() => router.push('/auth/logout')}
-              className="px-4 py-2 bg-pink text-white rounded-lg hover:bg-pink-600 transition-colors"
-            >
-              Logout
-            </button>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-200">{userEmail}</span>
+              <button 
+                onClick={handleSignOut}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-200 hover:text-white transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -343,9 +366,10 @@ export default function ReportsPage() {
                 onClick={() => setSelectedReport(report.id)}
                 className={`w-full text-left p-3 rounded-lg transition-colors flex items-start gap-3 ${
                   selectedReport === report.id
-                    ? 'bg-navy text-white'
+                    ? 'text-white'
                     : 'hover:bg-gray-50'
                 }`}
+                style={selectedReport === report.id ? { backgroundColor: '#33393c' } : {}}
               >
                 <div className={`p-2 rounded-lg ${
                   selectedReport === report.id ? 'bg-white/20' : report.color
@@ -369,7 +393,7 @@ export default function ReportsPage() {
         <div className="flex-1 p-6">
           {/* Filters */}
           <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-navy mb-4">Report Parameters</h2>
+            <h2 className="text-lg font-semibold mb-4" style={{ color: '#33393c' }}>Report Parameters</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -379,7 +403,7 @@ export default function ReportsPage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#e31c79] focus:border-transparent"
                 />
               </div>
               <div>
@@ -390,7 +414,7 @@ export default function ReportsPage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#e31c79] focus:border-transparent"
                 />
               </div>
               <div>
@@ -400,7 +424,7 @@ export default function ReportsPage() {
                 <select
                   value={selectedClient}
                   onChange={(e) => setSelectedClient(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#e31c79] focus:border-transparent"
                 >
                   <option value="all">All Clients</option>
                   {clients.map(client => (
@@ -415,7 +439,7 @@ export default function ReportsPage() {
                 <select
                   value={selectedDepartment}
                   onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#e31c79] focus:border-transparent"
                 >
                   <option value="all">All Departments</option>
                   {departments.map(dept => (
@@ -428,27 +452,27 @@ export default function ReportsPage() {
 
           {/* Report Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs text-gray-500 mb-1">Total Employees</p>
-              <p className="text-2xl font-bold text-navy">{reportSummary.totalEmployees}</p>
+              <p className="text-2xl font-bold" style={{ color: '#33393c' }}>{reportSummary.totalEmployees}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs text-gray-500 mb-1">Total Hours</p>
-              <p className="text-2xl font-bold text-navy">{reportSummary.totalHours.toFixed(1)}</p>
+              <p className="text-2xl font-bold" style={{ color: '#33393c' }}>{reportSummary.totalHours.toFixed(1)}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs text-gray-500 mb-1">Regular Hours</p>
               <p className="text-2xl font-bold text-blue-600">{reportSummary.totalRegularHours.toFixed(1)}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs text-gray-500 mb-1">Overtime Hours</p>
               <p className="text-2xl font-bold text-orange-600">{reportSummary.totalOvertimeHours.toFixed(1)}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs text-gray-500 mb-1">Total Payroll</p>
               <p className="text-2xl font-bold text-green-600">${reportSummary.totalPay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs text-gray-500 mb-1">Avg Hours/Employee</p>
               <p className="text-2xl font-bold text-purple-600">{reportSummary.averageHoursPerEmployee.toFixed(1)}</p>
             </div>
@@ -456,7 +480,7 @@ export default function ReportsPage() {
 
           {/* Action Buttons */}
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-semibold text-navy">Payroll Details</h3>
+            <h3 className="text-lg font-semibold" style={{ color: '#33393c' }}>Payroll Details</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => window.print()}
@@ -467,7 +491,8 @@ export default function ReportsPage() {
               </button>
               <button
                 onClick={exportToExcel}
-                className="px-4 py-2 bg-pink text-white rounded-lg hover:bg-pink-600 flex items-center gap-2"
+                className="px-4 py-2 text-white rounded-lg flex items-center gap-2 transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#e31c79' }}
               >
                 <Download className="h-4 w-4" />
                 Export to Excel
@@ -476,10 +501,10 @@ export default function ReportsPage() {
           </div>
 
           {/* Data Table */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             {loading ? (
               <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink mx-auto"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#e31c79] mx-auto"></div>
                 <p className="mt-4 text-gray-600">Generating report...</p>
               </div>
             ) : payrollData.length > 0 ? (
@@ -587,12 +612,12 @@ export default function ReportsPage() {
           </div>
 
           {/* Export Format Note */}
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="mt-6 rounded-lg p-4" style={{ backgroundColor: '#e5ddd8', borderColor: '#e31c79', borderWidth: '1px', borderStyle: 'solid' }}>
             <div className="flex">
-              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+              <AlertCircle className="h-5 w-5 mt-0.5 mr-3 flex-shrink-0" style={{ color: '#e31c79' }} />
               <div>
-                <h4 className="text-sm font-semibold text-blue-900 mb-1">Export Format</h4>
-                <p className="text-sm text-blue-700">
+                <h4 className="text-sm font-semibold text-gray-900 mb-1">Export Format</h4>
+                <p className="text-sm text-gray-700">
                   This report exports in a format compatible with Tracker payroll system. 
                   The CSV file includes all necessary fields for direct import including employee IDs, 
                   hours breakdown, and calculated pay amounts.

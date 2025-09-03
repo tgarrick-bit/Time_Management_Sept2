@@ -6,7 +6,6 @@ import React, { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import RoleGuard from '@/components/auth/RoleGuard';
-import type { Database } from '@/types/supabase';
 import type { Employee } from '@/types';
 import { 
   Users, Clock, DollarSign, Building2, FileText, 
@@ -41,7 +40,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   
   const router = useRouter();
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     checkAuthAndLoadData();
@@ -72,7 +71,7 @@ export default function AdminDashboard() {
         return;
       }
 
-      setAdmin(adminData);
+      setAdmin(adminData as Employee);
       await loadStats();
     } catch (error) {
       console.error('Error:', error);
@@ -206,7 +205,7 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#e31c79] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
@@ -217,7 +216,7 @@ export default function AdminDashboard() {
     <RoleGuard allowedRoles={['admin']}>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <header className="bg-[#05202E] shadow-lg">
+        <header className="bg-gray-900 shadow-lg">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center">
@@ -242,12 +241,6 @@ export default function AdminDashboard() {
                   Manager View
                 </button>
                 <button
-                  onClick={() => router.push('/dashboard')}
-                  className="text-sm text-gray-200 hover:text-white"
-                >
-                  Employee View
-                </button>
-                <button
                   onClick={handleSignOut}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-200 hover:text-white"
                 >
@@ -260,9 +253,9 @@ export default function AdminDashboard() {
         </header>
 
         {/* Welcome Section */}
-        <div className="bg-[#05202E] text-white pb-8">
+        <div className="bg-gray-900 text-white pb-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-            <h2 className="text-2xl font-bold">Welcome back, {admin?.first_name}!</h2>
+            <h2 className="text-2xl font-bold">Welcome back, {admin?.first_name || 'Admin'}!</h2>
             <p className="text-gray-300 mt-1">System Administrator • West End Workforce</p>
           </div>
         </div>
@@ -317,7 +310,7 @@ export default function AdminDashboard() {
                 onClick={() => router.push(section.path)}
                 className="bg-white rounded-lg shadow-sm p-6 hover:shadow-lg transition-all duration-200 text-left relative"
               >
-                {section.badge && section.badge > 0 && (
+                {section.badge !== null && section.badge > 0 && (
                   <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
                     {section.badge}
                   </span>

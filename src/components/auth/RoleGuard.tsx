@@ -5,7 +5,6 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import type { Database } from '@/types/supabase';
 import type { UserRole, Employee } from '@/types';
 
 interface RoleGuardProps {
@@ -23,7 +22,7 @@ export default function RoleGuard({
   const [isLoading, setIsLoading] = useState(true);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const router = useRouter();
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     checkAuthorization();
@@ -67,14 +66,14 @@ export default function RoleGuard({
           return;
         }
 
-        setEmployee(employeeByEmail);
-        checkRoleAndRedirect(employeeByEmail);
+        setEmployee(employeeByEmail as Employee);
+        checkRoleAndRedirect(employeeByEmail as Employee);
         return;
       }
 
       console.log('RoleGuard: Employee found:', employeeData.email, 'Role:', employeeData.role);
-      setEmployee(employeeData);
-      checkRoleAndRedirect(employeeData);
+      setEmployee(employeeData as Employee);
+      checkRoleAndRedirect(employeeData as Employee);
 
     } catch (error) {
       console.error('RoleGuard: Unexpected error:', error);
@@ -116,9 +115,9 @@ export default function RoleGuard({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#05202E' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
           <p className="mt-4 text-white">Checking authorization...</p>
         </div>
       </div>
@@ -127,7 +126,7 @@ export default function RoleGuard({
 
   if (!isAuthorized) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#05202E' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
           <p className="text-white">Redirecting...</p>
         </div>

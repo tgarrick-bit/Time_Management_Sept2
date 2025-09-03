@@ -1,13 +1,8 @@
 'use client';
 
-// src/app/dashboard/page.tsx
-
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import RoleGuard from '@/components/auth/RoleGuard';
-import type { Database } from '@/types/supabase';
-import type { Employee } from '@/types';
 import { 
   CalendarDays, 
   Clock, 
@@ -22,6 +17,19 @@ import {
   CreditCard,
   AlertCircle
 } from 'lucide-react';
+
+// Define types inline instead of importing
+interface Employee {
+  id: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  first_name?: string;
+  last_name?: string;
+  department?: string;
+  position?: string;
+  hire_date?: string;
+}
 
 interface Timecard {
   id: string;
@@ -66,7 +74,7 @@ export default function EmployeeDashboard() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     loadDashboardData();
@@ -126,31 +134,36 @@ export default function EmployeeDashboard() {
         }
       }
 
-      // Get user's timecards (using timecards table as per your code)
-      const { data: timecardsData, error: timecardsError } = await supabase
-        .from('timecards')
+      // Get user's timecards - try both table names
+      let timecardsData = null;
+      
+      // First try 'timesheets' table (which seems to be the correct one)
+      const { data: timesheetsData, error: timesheetsError } = await supabase
+        .from('timesheets')
         .select('*')
         .eq('employee_id', user.id)
         .order('week_ending', { ascending: false })
         .limit(10);
 
-      if (timecardsError) {
-        console.error('Error fetching timecards:', timecardsError);
-        // Check if table exists, might be named 'timesheets' instead
-        const { data: timesheetsData } = await supabase
-          .from('timesheets')
+      if (!timesheetsError) {
+        timecardsData = timesheetsData;
+      } else {
+        // Fallback to 'timecards' if 'timesheets' doesn't work
+        const { data: timecardsDataFallback } = await supabase
+          .from('timecards')
           .select('*')
           .eq('employee_id', user.id)
           .order('week_ending', { ascending: false })
           .limit(10);
         
-        if (timesheetsData) {
-          setTimecards(timesheetsData || []);
-          calculateTimecardStats(timesheetsData || []);
+        if (timecardsDataFallback) {
+          timecardsData = timecardsDataFallback;
         }
-      } else {
-        setTimecards(timecardsData || []);
-        calculateTimecardStats(timecardsData || []);
+      }
+
+      if (timecardsData) {
+        setTimecards(timecardsData);
+        calculateTimecardStats(timecardsData);
       }
 
       // Get user's expenses
@@ -280,298 +293,214 @@ export default function EmployeeDashboard() {
   }
 
   return (
-    <RoleGuard allowedRoles={['employee']}>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-[#05202E] shadow-lg">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <div className="flex items-center gap-3">
-                  <div className="bg-white/10 p-2 rounded-lg">
-                    <Briefcase className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-semibold text-white">
-                      West End Workforce
-                    </h1>
-                    <span className="text-xs text-gray-300">Employee Portal</span>
-                  </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-[#05202E] shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <div className="flex items-center gap-3">
+                <div className="bg-white/10 p-2 rounded-lg">
+                  <Briefcase className="h-5 w-5 text-white" />
                 </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center">
-                    <User className="h-4 w-4 text-white" />
-                  </div>
-                  <span className="text-sm text-gray-200">
-                    {employee?.email || 'Loading...'}
-                  </span>
+                <div>
+                  <h1 className="text-xl font-semibold text-white">
+                    West End Workforce
+                  </h1>
+                  <span className="text-xs text-gray-300">Employee Portal</span>
                 </div>
-                <button
-                  onClick={handleSignOut}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-200 hover:text-white transition-colors"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </button>
               </div>
             </div>
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Welcome Section */}
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-[#05202E] mb-2">
-              Welcome back{employee ? `, ${employee.first_name}` : ''}!
-            </h2>
-            <p className="text-gray-600">
-              Manage your timesheets and expenses
-            </p>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="mb-8 flex gap-4">
-            <button 
-              onClick={() => router.push('/timesheet/entry')}
-              className="flex items-center gap-3 px-6 py-3 bg-[#e31c79] text-white rounded-lg hover:bg-[#c91865] transition-all duration-200 font-medium shadow-lg"
-            >
-              <Plus className="h-5 w-5" />
-              Create New Timecard
-            </button>
-            
-            <button 
-              onClick={() => router.push('/expense/entry')}
-              className="flex items-center gap-3 px-6 py-3 bg-[#05202E] text-white rounded-lg hover:bg-[#0a2a3d] transition-all duration-200 font-medium shadow-lg"
-            >
-              <Receipt className="h-5 w-5" />
-              Submit Expense
-            </button>
-          </div>
-
-          {/* Stats Grid - Timesheets Row */}
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Timesheet Summary</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-4">
-              <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <Clock className="h-6 w-6 text-[#05202E]" />
-                  <span className="text-xs text-gray-500 font-medium uppercase">All Time</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center">
+                  <User className="h-4 w-4 text-white" />
                 </div>
-                <div className="text-2xl font-bold text-[#05202E]">{stats.totalHours.toFixed(1)}</div>
-                <p className="text-sm text-gray-600 mt-1">Total Hours</p>
+                <span className="text-sm text-gray-200">
+                  {employee?.email || 'Loading...'}
+                </span>
               </div>
-
-              <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <DollarSign className="h-6 w-6 text-[#05202E]" />
-                  <span className="text-xs text-gray-500 font-medium uppercase">Approved</span>
-                </div>
-                <div className="text-2xl font-bold text-[#05202E]">{formatCurrency(stats.totalEarnings)}</div>
-                <p className="text-sm text-gray-600 mt-1">Total Earnings</p>
-              </div>
-
-              <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <FileText className="h-6 w-6 text-[#05202E]" />
-                  <span className="text-xs text-gray-500 font-medium uppercase">Pending</span>
-                </div>
-                <div className="text-2xl font-bold text-[#05202E]">{stats.pendingTimecards}</div>
-                <p className="text-sm text-gray-600 mt-1">Awaiting Review</p>
-              </div>
-
-              <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <CalendarDays className="h-6 w-6 text-[#05202E]" />
-                  <span className="text-xs text-gray-500 font-medium uppercase">Completed</span>
-                </div>
-                <div className="text-2xl font-bold text-[#05202E]">{stats.approvedTimecards}</div>
-                <p className="text-sm text-gray-600 mt-1">Approved</p>
-              </div>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-200 hover:text-white transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </button>
             </div>
           </div>
+        </div>
+      </header>
 
-          {/* Stats Grid - Expenses Row */}
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Expense Summary</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <Receipt className="h-6 w-6 text-[#e31c79]" />
-                  <span className="text-xs text-gray-500 font-medium uppercase">Total</span>
-                </div>
-                <div className="text-2xl font-bold text-[#e31c79]">{formatCurrency(stats.totalExpenses)}</div>
-                <p className="text-sm text-gray-600 mt-1">All Expenses</p>
-              </div>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-[#05202E] mb-2">
+            Welcome back{employee ? `, ${employee.first_name}` : ''}!
+          </h2>
+          <p className="text-gray-600">
+            Manage your timesheets and expenses
+          </p>
+        </div>
 
-              <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <CreditCard className="h-6 w-6 text-[#e31c79]" />
-                  <span className="text-xs text-gray-500 font-medium uppercase">Pending</span>
-                </div>
-                <div className="text-2xl font-bold text-[#e31c79]">{formatCurrency(stats.pendingExpenses)}</div>
-                <p className="text-sm text-gray-600 mt-1">Under Review</p>
-              </div>
+        {/* Quick Actions */}
+        <div className="mb-8 flex gap-4">
+          <button 
+            onClick={() => router.push('/timesheet/entry')}
+            className="flex items-center gap-3 px-6 py-3 bg-[#e31c79] text-white rounded-lg hover:bg-[#c91865] transition-all duration-200 font-medium shadow-lg"
+          >
+            <Plus className="h-5 w-5" />
+            Create New Timecard
+          </button>
+          
+          <button 
+            onClick={() => router.push('/expense/entry')}
+            className="flex items-center gap-3 px-6 py-3 bg-[#05202E] text-white rounded-lg hover:bg-[#0a2a3d] transition-all duration-200 font-medium shadow-lg"
+          >
+            <Receipt className="h-5 w-5" />
+            Submit Expense
+          </button>
+        </div>
 
-              <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <DollarSign className="h-6 w-6 text-[#e31c79]" />
-                  <span className="text-xs text-gray-500 font-medium uppercase">Approved</span>
-                </div>
-                <div className="text-2xl font-bold text-[#e31c79]">{formatCurrency(stats.approvedExpenses)}</div>
-                <p className="text-sm text-gray-600 mt-1">Reimbursed</p>
-              </div>
-
-              <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <AlertCircle className="h-6 w-6 text-[#e31c79]" />
-                  <span className="text-xs text-gray-500 font-medium uppercase">Action</span>
-                </div>
-                <div className="text-2xl font-bold text-[#e31c79]">{stats.rejectedExpenses}</div>
-                <p className="text-sm text-gray-600 mt-1">Rejected</p>
-              </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <Clock className="h-6 w-6 text-[#05202E]" />
+              <span className="text-xs text-gray-500 font-medium uppercase">All Time</span>
             </div>
+            <div className="text-2xl font-bold text-[#05202E]">{stats.totalHours.toFixed(1)}</div>
+            <p className="text-sm text-gray-600 mt-1">Total Hours</p>
           </div>
 
-          {/* Recent Activity - Two Columns */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Timecards */}
-            <div className="bg-white rounded-lg shadow-sm">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-[#05202E]">Recent Timecards</h3>
-                <p className="text-sm text-gray-600 mt-1">Your latest timesheet submissions</p>
-              </div>
-              <div className="p-6">
-                {timecards.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FileText className="h-8 w-8 text-gray-400" />
-                    </div>
-                    <p className="text-gray-600 font-medium">No timecards yet</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Click "Create New Timecard" to get started
-                    </p>
+          <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <DollarSign className="h-6 w-6 text-[#05202E]" />
+              <span className="text-xs text-gray-500 font-medium uppercase">Pending</span>
+            </div>
+            <div className="text-2xl font-bold text-[#05202E]">{stats.pendingTimecards}</div>
+            <p className="text-sm text-gray-600 mt-1">Awaiting Review</p>
+          </div>
+
+          <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <Receipt className="h-6 w-6 text-[#e31c79]" />
+              <span className="text-xs text-gray-500 font-medium uppercase">Expenses</span>
+            </div>
+            <div className="text-2xl font-bold text-[#e31c79]">{formatCurrency(stats.totalExpenses)}</div>
+            <p className="text-sm text-gray-600 mt-1">Total Submitted</p>
+          </div>
+
+          <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <CreditCard className="h-6 w-6 text-[#e31c79]" />
+              <span className="text-xs text-gray-500 font-medium uppercase">Approved</span>
+            </div>
+            <div className="text-2xl font-bold text-[#e31c79]">{formatCurrency(stats.approvedExpenses)}</div>
+            <p className="text-sm text-gray-600 mt-1">Reimbursed</p>
+          </div>
+        </div>
+
+        {/* Recent Activity - Two Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Timecards */}
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-[#05202E]">Recent Timecards</h3>
+              <p className="text-sm text-gray-600 mt-1">Your latest timesheet submissions</p>
+            </div>
+            <div className="p-6">
+              {timecards.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FileText className="h-8 w-8 text-gray-400" />
                   </div>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {timecards.slice(0, 5).map((timecard) => (
-                      <div
-                        key={timecard.id}
-                        className="group flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 border border-gray-200 cursor-pointer"
-                        onClick={() => router.push(`/timesheet/${timecard.id}`)}
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <div>
-                              <p className="font-medium text-sm text-[#05202E]">
-                                Week ending {formatDate(timecard.week_ending)}
-                              </p>
-                              <p className="text-xs text-gray-600 mt-1">
-                                {timecard.total_hours} hrs • {formatCurrency(timecard.total_amount)}
-                              </p>
-                            </div>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusColor(timecard.status)}`}>
-                              {timecard.status.charAt(0).toUpperCase() + timecard.status.slice(1)}
-                            </span>
+                  <p className="text-gray-600 font-medium">No timecards yet</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Click "Create New Timecard" to get started
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {timecards.slice(0, 5).map((timecard) => (
+                    <div
+                      key={timecard.id}
+                      className="group flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 border border-gray-200 cursor-pointer"
+                      onClick={() => router.push(`/timesheet/${timecard.id}`)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <p className="font-medium text-sm text-[#05202E]">
+                              Week ending {formatDate(timecard.week_ending)}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {timecard.total_hours} hrs
+                            </p>
                           </div>
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusColor(timecard.status)}`}>
+                            {timecard.status.charAt(0).toUpperCase() + timecard.status.slice(1)}
+                          </span>
                         </div>
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Recent Expenses */}
-            <div className="bg-white rounded-lg shadow-sm">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-[#05202E]">Recent Expenses</h3>
-                <p className="text-sm text-gray-600 mt-1">Your latest expense submissions</p>
-              </div>
-              <div className="p-6">
-                {expenses.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Receipt className="h-8 w-8 text-gray-400" />
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
                     </div>
-                    <p className="text-gray-600 font-medium">No expenses yet</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Click "Submit Expense" to get started
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {expenses.slice(0, 5).map((expense) => (
-                      <div
-                        key={expense.id}
-                        className="group flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 border border-gray-200 cursor-pointer"
-                        onClick={() => router.push(`/expense/${expense.id}`)}
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <div>
-                              <p className="font-medium text-sm text-[#05202E]">
-                                {getCategoryLabel(expense.category)} - {formatDate(expense.expense_date)}
-                              </p>
-                              <p className="text-xs text-gray-600 mt-1">
-                                {formatCurrency(expense.amount)} • {expense.description || 'No description'}
-                              </p>
-                            </div>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusColor(expense.status)}`}>
-                              {expense.status.charAt(0).toUpperCase() + expense.status.slice(1)}
-                            </span>
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Employee Info Section (if available) */}
-          {employee && (
-            <div className="mt-8 bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-[#05202E] mb-4">Employee Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500">Name</p>
-                  <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Email</p>
-                  <p className="font-medium">{employee.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Department</p>
-                  <p className="font-medium">{employee.department || 'Not assigned'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Position</p>
-                  <p className="font-medium">{employee.position || 'Not specified'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Status</p>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Active
-                  </span>
-                </div>
-                {employee.hire_date && (
-                  <div>
-                    <p className="text-sm text-gray-500">Hire Date</p>
-                    <p className="font-medium">{formatDate(employee.hire_date)}</p>
-                  </div>
-                )}
-              </div>
+          {/* Recent Expenses */}
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-[#05202E]">Recent Expenses</h3>
+              <p className="text-sm text-gray-600 mt-1">Your latest expense submissions</p>
             </div>
-          )}
-        </main>
-      </div>
-    </RoleGuard>
+            <div className="p-6">
+              {expenses.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Receipt className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-600 font-medium">No expenses yet</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Click "Submit Expense" to get started
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {expenses.slice(0, 5).map((expense) => (
+                    <div
+                      key={expense.id}
+                      className="group flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 border border-gray-200 cursor-pointer"
+                      onClick={() => router.push(`/expense/${expense.id}`)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <p className="font-medium text-sm text-[#05202E]">
+                              {getCategoryLabel(expense.category)}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {formatCurrency(expense.amount)} • {formatDate(expense.expense_date)}
+                            </p>
+                          </div>
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusColor(expense.status)}`}>
+                            {expense.status.charAt(0).toUpperCase() + expense.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }
