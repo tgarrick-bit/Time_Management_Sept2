@@ -1,141 +1,114 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { User } from '@/types';
+
+// Define User type directly here to avoid import issues
+interface User {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: 'employee' | 'manager' | 'admin' | 'client_approver' | 'payroll';
+  client_id?: string;
+  manager_id?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 interface AuthContextType {
   user: User | null;
   appUser: User | null;
-  login: (email: string, password: string) => Promise<{ success: boolean; user?: User; error?: string }>;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; user?: User; error?: string }>;
-  logout: () => void;
-  signOut: () => void;
+  login: (email: string, password: string) => Promise<{ success: boolean; user?: User }>;
+  logout: () => Promise<void>;
   isLoading: boolean;
-  isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Demo user database - matching your login page
-const demoUsers = {
-  'employee@westendworkforce.com': {
-    id: 'employee-demo',
-    email: 'employee@westendworkforce.com',
-    first_name: 'John',
-    last_name: 'Employee',
-    role: 'employee' as const,
-    manager_id: 'manager-demo',
-    client_id: undefined,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  'manager@westendworkforce.com': {
-    id: 'manager-demo',
-    email: 'manager@westendworkforce.com',
-    first_name: 'Jane',
-    last_name: 'Manager',
-    role: 'manager' as const,
-    manager_id: undefined,
-    client_id: undefined,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  'admin@westendworkforce.com': {
-    id: 'admin-demo',
-    email: 'admin@westendworkforce.com',
-    first_name: 'Tracy',
-    last_name: 'Admin',
-    role: 'admin' as const,
-    manager_id: undefined,
-    client_id: undefined,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-};
-
-const demoPasswords = {
-  'employee@westendworkforce.com': 'employee123',
-  'manager@westendworkforce.com': 'manager123',
-  'admin@westendworkforce.com': 'admin123'
-};
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [appUser, setAppUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
-    // Check for existing session on client side only
-    if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('auth_user');
-      if (savedUser) {
-        try {
-          setUser(JSON.parse(savedUser));
-        } catch (error) {
-          localStorage.removeItem('auth_user');
-        }
-      }
-    }
-    setIsLoading(false);
+    checkUser();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+  const checkUser = async () => {
     try {
-      // Check demo users
-      const demoUser = demoUsers[email as keyof typeof demoUsers];
-      const demoPassword = demoPasswords[email as keyof typeof demoPasswords];
-      
-      if (demoUser && password === demoPassword) {
-        setUser(demoUser);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('auth_user', JSON.stringify(demoUser));
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile) {
+          setUser(profile as User);
+          setAppUser(profile as User);
         }
-        setIsLoading(false);
-        return { success: true, user: demoUser };
       }
-      
-      setIsLoading(false);
-      return { success: false, error: 'Invalid email or password' };
-      
     } catch (error) {
+      console.error('Error checking user:', error);
+    } finally {
       setIsLoading(false);
-      return { success: false, error: 'Login failed. Please try again.' };
     }
   };
 
-  const logout = () => {
+  const login = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile) {
+          setUser(profile as User);
+          setAppUser(profile as User);
+          return { success: true, user: profile as User };
+        }
+      }
+
+      return { success: false };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false };
+    }
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_user');
-    }
+    setAppUser(null);
+    router.push('/auth/login');
   };
 
-  const value = {
-    user,
-    appUser: user,
-    login,
-    signIn: login,
-    logout,
-    signOut: logout,
-    isLoading,
-    isAuthenticated: !!user
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, appUser, login, logout, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};

@@ -1,200 +1,577 @@
-'use client'
+'use client';
 
-import { useAuth } from '@/contexts/AuthContext'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import ProtectedRoute from '@/components/auth/ProtectedRoute'
-import TopNavigation from '@/components/navigation/TopNavigation'
-import { Clock, DollarSign, User, Plus, Receipt, ChevronRight } from 'lucide-react'
+// src/app/dashboard/page.tsx
 
-export default function EmployeePortalPage() {
-  const { user } = useAuth()
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import RoleGuard from '@/components/auth/RoleGuard';
+import type { Database } from '@/types/supabase';
+import type { Employee } from '@/types';
+import { 
+  CalendarDays, 
+  Clock, 
+  DollarSign, 
+  FileText,
+  Plus,
+  ChevronRight,
+  User,
+  LogOut,
+  Briefcase,
+  Receipt,
+  CreditCard,
+  AlertCircle
+} from 'lucide-react';
+
+interface Timecard {
+  id: string;
+  week_ending: string;
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  total_hours: number;
+  total_amount: number;
+  submitted_at: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  created_at: string;
+}
+
+interface Expense {
+  id: string;
+  expense_date: string;
+  category: string;
+  amount: number;
+  description: string;
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  project_id: string;
+  receipt_url?: string;
+  submitted_at: string | null;
+  created_at: string;
+}
+
+export default function EmployeeDashboard() {
+  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [timecards, setTimecards] = useState<Timecard[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [stats, setStats] = useState({
+    // Timesheet stats
+    totalHours: 0,
+    totalEarnings: 0,
+    pendingTimecards: 0,
+    approvedTimecards: 0,
+    // Expense stats
+    totalExpenses: 0,
+    pendingExpenses: 0,
+    approvedExpenses: 0,
+    rejectedExpenses: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login')
-    } else {
-      setIsLoading(false)
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('Error getting user:', userError);
+        router.push('/auth/login');
+        return;
+      }
+
+      // Get employee data from employees table
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (employeeError) {
+        console.error('Error fetching employee:', employeeError);
+        
+        // Try fetching by email as fallback
+        const { data: employeeByEmail } = await supabase
+          .from('employees')
+          .select('*')
+          .eq('email', user.email!)
+          .single();
+
+        if (employeeByEmail) {
+          setEmployee(employeeByEmail);
+          
+          // Check role and redirect if not employee
+          if (employeeByEmail.role !== 'employee') {
+            console.log('User is not employee role, redirecting...');
+            redirectBasedOnRole(employeeByEmail.role);
+            return;
+          }
+        } else {
+          // No employee record found
+          console.error('No employee record found for user');
+          router.push('/auth/login');
+          return;
+        }
+      } else {
+        setEmployee(employeeData);
+        
+        // Check role and redirect if not employee
+        if (employeeData.role !== 'employee') {
+          console.log('User is not employee role, redirecting...');
+          redirectBasedOnRole(employeeData.role);
+          return;
+        }
+      }
+
+      // Get user's timecards (using timecards table as per your code)
+      const { data: timecardsData, error: timecardsError } = await supabase
+        .from('timecards')
+        .select('*')
+        .eq('employee_id', user.id)
+        .order('week_ending', { ascending: false })
+        .limit(10);
+
+      if (timecardsError) {
+        console.error('Error fetching timecards:', timecardsError);
+        // Check if table exists, might be named 'timesheets' instead
+        const { data: timesheetsData } = await supabase
+          .from('timesheets')
+          .select('*')
+          .eq('employee_id', user.id)
+          .order('week_ending', { ascending: false })
+          .limit(10);
+        
+        if (timesheetsData) {
+          setTimecards(timesheetsData || []);
+          calculateTimecardStats(timesheetsData || []);
+        }
+      } else {
+        setTimecards(timecardsData || []);
+        calculateTimecardStats(timecardsData || []);
+      }
+
+      // Get user's expenses
+      const { data: expensesData, error: expensesError } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('employee_id', user.id)
+        .order('expense_date', { ascending: false })
+        .limit(10);
+
+      if (expensesError) {
+        console.error('Error fetching expenses:', expensesError);
+      } else {
+        setExpenses(expensesData || []);
+        calculateExpenseStats(expensesData || []);
+      }
+    } catch (error) {
+      console.error('Dashboard error:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, [user, router])
+  };
 
-  const handleCardClick = (route: string) => {
-    router.push(route)
-  }
-
-  const handleQuickAction = (action: string) => {
-    switch (action) {
-      case 'timesheet':
-        router.push('/timesheets')
-        break
-      case 'expense':
-        router.push('/expenses')
-        break
+  const redirectBasedOnRole = (role: string) => {
+    switch (role.toLowerCase()) {
+      case 'admin':
+        router.push('/admin');
+        break;
+      case 'manager':
+        router.push('/manager');
+        break;
       default:
-        break
+        router.push('/dashboard');
+        break;
     }
-  }
+  };
 
-  if (isLoading || !user) {
+  const calculateTimecardStats = (timecardsData: Timecard[]) => {
+    const timecardStats = timecardsData.reduce((acc, tc) => ({
+      totalHours: acc.totalHours + (tc.total_hours || 0),
+      totalEarnings: acc.totalEarnings + (tc.total_amount || 0),
+      pendingTimecards: acc.pendingTimecards + (tc.status === 'submitted' ? 1 : 0),
+      approvedTimecards: acc.approvedTimecards + (tc.status === 'approved' ? 1 : 0)
+    }), {
+      totalHours: 0,
+      totalEarnings: 0,
+      pendingTimecards: 0,
+      approvedTimecards: 0
+    });
+    
+    setStats(prev => ({ ...prev, ...timecardStats }));
+  };
+
+  const calculateExpenseStats = (expensesData: Expense[]) => {
+    const expenseStats = expensesData.reduce((acc, exp) => ({
+      totalExpenses: acc.totalExpenses + (exp.amount || 0),
+      pendingExpenses: acc.pendingExpenses + (exp.status === 'submitted' ? exp.amount : 0),
+      approvedExpenses: acc.approvedExpenses + (exp.status === 'approved' ? exp.amount : 0),
+      rejectedExpenses: acc.rejectedExpenses + (exp.status === 'rejected' ? 1 : 0)
+    }), {
+      totalExpenses: 0,
+      pendingExpenses: 0,
+      approvedExpenses: 0,
+      rejectedExpenses: 0
+    });
+
+    setStats(prev => ({ ...prev, ...expenseStats }));
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/auth/login');
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      draft: 'bg-gray-100 text-gray-700 border-gray-300',
+      submitted: 'bg-amber-50 text-amber-700 border-amber-300',
+      approved: 'bg-emerald-50 text-emerald-700 border-emerald-300',
+      rejected: 'bg-red-50 text-red-700 border-red-300'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700 border-gray-300';
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  const getCategoryLabel = (category: string) => {
+    const labels: Record<string, string> = {
+      travel: 'Travel',
+      mileage: 'Mileage',
+      meals: 'Meals',
+      accommodation: 'Accommodation',
+      supplies: 'Supplies',
+      equipment: 'Equipment',
+      software: 'Software',
+      training: 'Training',
+      communication: 'Communication',
+      parking: 'Parking',
+      shipping: 'Shipping',
+      other: 'Other'
+    };
+    return labels[category] || category;
+  };
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#e31c79] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  // Show employee dashboard
   return (
-    <ProtectedRoute allowedRoles={['employee']}>
-      <TopNavigation />
+    <RoleGuard allowedRoles={['employee']}>
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Header */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Welcome back, {`${user.first_name} ${user.last_name}`}!
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Employee • Employee Dashboard
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  ID: {user.id}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div 
-              onClick={() => handleCardClick('/timesheets')}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200 cursor-pointer group"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-pink-600 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-white" />
-                </div>
-                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-pink-600 transition-colors" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Timesheets</h3>
-              <p className="text-gray-600 text-sm">Track time and submit weekly timesheets</p>
-            </div>
-
-            <div 
-              onClick={() => handleCardClick('/expenses')}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200 cursor-pointer group"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-white" />
-                </div>
-                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Expenses</h3>
-              <p className="text-gray-600 text-sm">Submit and track business expenses</p>
-            </div>
-
-            <div 
-              onClick={() => handleCardClick('/profile')}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200 cursor-pointer group"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                  <User className="w-6 h-6 text-white" />
-                </div>
-                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-green-600 transition-colors" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Profile</h3>
-              <p className="text-gray-600 text-sm">Update your personal information</p>
-            </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Recent Activity</h2>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
-                    <Clock className="w-4 h-4 text-pink-600" />
+        {/* Header */}
+        <header className="bg-[#05202E] shadow-lg">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/10 p-2 rounded-lg">
+                    <Briefcase className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Last timesheet submitted</p>
-                    <p className="text-xs text-gray-500">Submitted for approval</p>
+                    <h1 className="text-xl font-semibold text-white">
+                      West End Workforce
+                    </h1>
+                    <span className="text-xs text-gray-300">Employee Portal</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-900">2 days ago</p>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                    Pending
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center">
+                    <User className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="text-sm text-gray-200">
+                    {employee?.email || 'Loading...'}
                   </span>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Hours this month</p>
-                    <p className="text-xs text-gray-500">Total logged hours</p>
-                  </div>
-                </div>
-                <p className="text-sm font-semibold text-gray-900">0.0h</p>
-              </div>
-
-              <div className="flex items-center justify-between py-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Average daily hours</p>
-                    <p className="text-xs text-gray-500">Daily average this month</p>
-                  </div>
-                </div>
-                <p className="text-sm font-semibold text-gray-900">0.0h</p>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-200 hover:text-white transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
               </div>
             </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Welcome Section */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-[#05202E] mb-2">
+              Welcome back{employee ? `, ${employee.first_name}` : ''}!
+            </h2>
+            <p className="text-gray-600">
+              Manage your timesheets and expenses
+            </p>
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Quick Actions</h2>
+          <div className="mb-8 flex gap-4">
+            <button 
+              onClick={() => router.push('/timesheet/entry')}
+              className="flex items-center gap-3 px-6 py-3 bg-[#e31c79] text-white rounded-lg hover:bg-[#c91865] transition-all duration-200 font-medium shadow-lg"
+            >
+              <Plus className="h-5 w-5" />
+              Create New Timecard
+            </button>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button 
-                onClick={() => handleQuickAction('timesheet')}
-                className="flex items-center justify-center space-x-3 bg-gradient-to-r from-pink-500 to-pink-600 text-white px-6 py-4 rounded-lg hover:from-pink-600 hover:to-pink-700 transition-all duration-200 shadow-sm hover:shadow-md"
-              >
-                <Plus className="w-5 h-5" />
-                <span className="font-medium">Add Time Entry</span>
-              </button>
+            <button 
+              onClick={() => router.push('/expense/entry')}
+              className="flex items-center gap-3 px-6 py-3 bg-[#05202E] text-white rounded-lg hover:bg-[#0a2a3d] transition-all duration-200 font-medium shadow-lg"
+            >
+              <Receipt className="h-5 w-5" />
+              Submit Expense
+            </button>
+          </div>
 
-              <button 
-                onClick={() => handleQuickAction('expense')}
-                className="flex items-center justify-center space-x-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
-              >
-                <Receipt className="w-5 h-5" />
-                <span className="font-medium">Submit Expense</span>
-              </button>
+          {/* Stats Grid - Timesheets Row */}
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Timesheet Summary</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-4">
+              <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <Clock className="h-6 w-6 text-[#05202E]" />
+                  <span className="text-xs text-gray-500 font-medium uppercase">All Time</span>
+                </div>
+                <div className="text-2xl font-bold text-[#05202E]">{stats.totalHours.toFixed(1)}</div>
+                <p className="text-sm text-gray-600 mt-1">Total Hours</p>
+              </div>
+
+              <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <DollarSign className="h-6 w-6 text-[#05202E]" />
+                  <span className="text-xs text-gray-500 font-medium uppercase">Approved</span>
+                </div>
+                <div className="text-2xl font-bold text-[#05202E]">{formatCurrency(stats.totalEarnings)}</div>
+                <p className="text-sm text-gray-600 mt-1">Total Earnings</p>
+              </div>
+
+              <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <FileText className="h-6 w-6 text-[#05202E]" />
+                  <span className="text-xs text-gray-500 font-medium uppercase">Pending</span>
+                </div>
+                <div className="text-2xl font-bold text-[#05202E]">{stats.pendingTimecards}</div>
+                <p className="text-sm text-gray-600 mt-1">Awaiting Review</p>
+              </div>
+
+              <div className="bg-white rounded-lg border border-[#05202E] p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <CalendarDays className="h-6 w-6 text-[#05202E]" />
+                  <span className="text-xs text-gray-500 font-medium uppercase">Completed</span>
+                </div>
+                <div className="text-2xl font-bold text-[#05202E]">{stats.approvedTimecards}</div>
+                <p className="text-sm text-gray-600 mt-1">Approved</p>
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Stats Grid - Expenses Row */}
+          <div className="mb-8">
+            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Expense Summary</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <Receipt className="h-6 w-6 text-[#e31c79]" />
+                  <span className="text-xs text-gray-500 font-medium uppercase">Total</span>
+                </div>
+                <div className="text-2xl font-bold text-[#e31c79]">{formatCurrency(stats.totalExpenses)}</div>
+                <p className="text-sm text-gray-600 mt-1">All Expenses</p>
+              </div>
+
+              <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <CreditCard className="h-6 w-6 text-[#e31c79]" />
+                  <span className="text-xs text-gray-500 font-medium uppercase">Pending</span>
+                </div>
+                <div className="text-2xl font-bold text-[#e31c79]">{formatCurrency(stats.pendingExpenses)}</div>
+                <p className="text-sm text-gray-600 mt-1">Under Review</p>
+              </div>
+
+              <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <DollarSign className="h-6 w-6 text-[#e31c79]" />
+                  <span className="text-xs text-gray-500 font-medium uppercase">Approved</span>
+                </div>
+                <div className="text-2xl font-bold text-[#e31c79]">{formatCurrency(stats.approvedExpenses)}</div>
+                <p className="text-sm text-gray-600 mt-1">Reimbursed</p>
+              </div>
+
+              <div className="bg-white rounded-lg border border-[#e31c79] p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <AlertCircle className="h-6 w-6 text-[#e31c79]" />
+                  <span className="text-xs text-gray-500 font-medium uppercase">Action</span>
+                </div>
+                <div className="text-2xl font-bold text-[#e31c79]">{stats.rejectedExpenses}</div>
+                <p className="text-sm text-gray-600 mt-1">Rejected</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Activity - Two Columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Recent Timecards */}
+            <div className="bg-white rounded-lg shadow-sm">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-[#05202E]">Recent Timecards</h3>
+                <p className="text-sm text-gray-600 mt-1">Your latest timesheet submissions</p>
+              </div>
+              <div className="p-6">
+                {timecards.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <FileText className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <p className="text-gray-600 font-medium">No timecards yet</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Click "Create New Timecard" to get started
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {timecards.slice(0, 5).map((timecard) => (
+                      <div
+                        key={timecard.id}
+                        className="group flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 border border-gray-200 cursor-pointer"
+                        onClick={() => router.push(`/timesheet/${timecard.id}`)}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="font-medium text-sm text-[#05202E]">
+                                Week ending {formatDate(timecard.week_ending)}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                {timecard.total_hours} hrs • {formatCurrency(timecard.total_amount)}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusColor(timecard.status)}`}>
+                              {timecard.status.charAt(0).toUpperCase() + timecard.status.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Recent Expenses */}
+            <div className="bg-white rounded-lg shadow-sm">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-[#05202E]">Recent Expenses</h3>
+                <p className="text-sm text-gray-600 mt-1">Your latest expense submissions</p>
+              </div>
+              <div className="p-6">
+                {expenses.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Receipt className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <p className="text-gray-600 font-medium">No expenses yet</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Click "Submit Expense" to get started
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {expenses.slice(0, 5).map((expense) => (
+                      <div
+                        key={expense.id}
+                        className="group flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 border border-gray-200 cursor-pointer"
+                        onClick={() => router.push(`/expense/${expense.id}`)}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="font-medium text-sm text-[#05202E]">
+                                {getCategoryLabel(expense.category)} - {formatDate(expense.expense_date)}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                {formatCurrency(expense.amount)} • {expense.description || 'No description'}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusColor(expense.status)}`}>
+                              {expense.status.charAt(0).toUpperCase() + expense.status.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Employee Info Section (if available) */}
+          {employee && (
+            <div className="mt-8 bg-white rounded-lg shadow-sm p-6">
+              <h3 className="text-lg font-semibold text-[#05202E] mb-4">Employee Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Name</p>
+                  <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Email</p>
+                  <p className="font-medium">{employee.email}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Department</p>
+                  <p className="font-medium">{employee.department || 'Not assigned'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Position</p>
+                  <p className="font-medium">{employee.position || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Status</p>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Active
+                  </span>
+                </div>
+                {employee.hire_date && (
+                  <div>
+                    <p className="text-sm text-gray-500">Hire Date</p>
+                    <p className="font-medium">{formatDate(employee.hire_date)}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </main>
       </div>
-    </ProtectedRoute>
-  )
+    </RoleGuard>
+  );
 }

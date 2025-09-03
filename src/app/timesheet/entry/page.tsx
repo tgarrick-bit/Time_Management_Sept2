@@ -1,248 +1,624 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { ArrowLeft, Plus, Save, Send, Trash2, Calendar, Briefcase, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 
 interface TimeEntry {
-  id: string
-  day: string
-  project: string
-  hours: number
-  description: string
+  id: string;
+  project_id: string;
+  project_name: string;
+  client_name?: string;
+  monday: number;
+  tuesday: number;
+  wednesday: number;
+  thursday: number;
+  friday: number;
+  saturday: number;
+  sunday: number;
+  total: number;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  client_name?: string;
+  is_active: boolean;
+}
+
+interface Employee {
+  id: string;
+  is_exempt: boolean;
+  state: string;
 }
 
 export default function TimesheetEntryPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
-  const [formData, setFormData] = useState({
-    day: '',
-    project: '',
-    hours: 8,
-    description: ''
-  })
-
-  const projects = [
-    'Metro Hospital - Nursing Staff',
-    'Downtown Office - Security',
-    'City Schools - Substitute Teachers',
-    'Riverside Manufacturing'
-  ]
-
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-  const dates = ['Aug 11', 'Aug 12', 'Aug 13', 'Aug 14', 'Aug 15', 'Aug 16', 'Aug 17']
-
-  const handleAddTimeEntry = () => {
-    if (!formData.day || !formData.project || formData.hours <= 0) {
-      alert('Please fill in all required fields')
-      return
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+  const [weekEnding, setWeekEnding] = useState('');
+  const [entries, setEntries] = useState<TimeEntry[]>([
+    {
+      id: '1',
+      project_id: '',
+      project_name: '',
+      client_name: '',
+      monday: 0,
+      tuesday: 0,
+      wednesday: 0,
+      thursday: 0,
+      friday: 0,
+      saturday: 0,
+      sunday: 0,
+      total: 0
     }
+  ]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [employeeInfo, setEmployeeInfo] = useState<Employee | null>(null);
+  const [attestations, setAttestations] = useState({
+    accurateTime: false,
+    breaksTaken: false,
+    noInjuries: false
+  });
 
+  useEffect(() => {
+    checkAuth();
+    loadProjects();
+    // Set default week ending (next Sunday)
+    const today = new Date();
+    const daysUntilSunday = 7 - today.getDay();
+    const nextSunday = new Date(today);
+    nextSunday.setDate(today.getDate() + daysUntilSunday);
+    setWeekEnding(nextSunday.toISOString().split('T')[0]);
+  }, []);
+
+  const checkAuth = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+    setUserEmail(user.email || '');
+    
+    // Fetch employee info for overtime calculation
+    const { data: empData } = await supabase
+      .from('employees')
+      .select('id, is_exempt, state')
+      .eq('id', user.id)
+      .single();
+    
+    if (empData) {
+      setEmployeeInfo(empData);
+    }
+  };
+
+  const loadProjects = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, name, is_active')
+      .eq('is_active', true)
+      .order('name');
+    
+    if (error) {
+      console.error('Error loading projects:', error);
+    } else {
+      const mappedProjects = (data || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        client_name: '',
+        is_active: p.is_active
+      }));
+      setProjects(mappedProjects);
+    }
+  };
+
+  const updateHours = (entryId: string, day: string, hours: string) => {
+    const hoursNum = parseFloat(hours) || 0;
+    setEntries(entries.map(entry => {
+      if (entry.id === entryId) {
+        const updated = { ...entry, [day]: hoursNum };
+        updated.total = updated.monday + updated.tuesday + updated.wednesday + 
+                       updated.thursday + updated.friday + updated.saturday + updated.sunday;
+        return updated;
+      }
+      return entry;
+    }));
+  };
+
+  const updateProject = (entryId: string, projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    setEntries(entries.map(entry => {
+      if (entry.id === entryId) {
+        return {
+          ...entry,
+          project_id: projectId,
+          project_name: project?.name || '',
+          client_name: project?.client_name || ''
+        };
+      }
+      return entry;
+    }));
+  };
+
+  const addRow = () => {
     const newEntry: TimeEntry = {
       id: Date.now().toString(),
-      day: formData.day,
-      project: formData.project,
-      hours: formData.hours,
-      description: formData.description
+      project_id: '',
+      project_name: '',
+      client_name: '',
+      monday: 0,
+      tuesday: 0,
+      wednesday: 0,
+      thursday: 0,
+      friday: 0,
+      saturday: 0,
+      sunday: 0,
+      total: 0
+    };
+    setEntries([...entries, newEntry]);
+  };
+
+  const removeRow = (id: string) => {
+    if (entries.length > 1) {
+      setEntries(entries.filter(entry => entry.id !== id));
+    }
+  };
+
+  const calculateDailyTotals = () => {
+    const totals = {
+      monday: 0,
+      tuesday: 0,
+      wednesday: 0,
+      thursday: 0,
+      friday: 0,
+      saturday: 0,
+      sunday: 0,
+      total: 0
+    };
+    
+    entries.forEach(entry => {
+      totals.monday += entry.monday;
+      totals.tuesday += entry.tuesday;
+      totals.wednesday += entry.wednesday;
+      totals.thursday += entry.thursday;
+      totals.friday += entry.friday;
+      totals.saturday += entry.saturday;
+      totals.sunday += entry.sunday;
+      totals.total += entry.total;
+    });
+    
+    return totals;
+  };
+
+  const calculateOvertime = (totals: any) => {
+    if (!employeeInfo || employeeInfo.is_exempt) return 0;
+    
+    let overtime = 0;
+    
+    if (employeeInfo.state === 'CA') {
+      // California: Daily overtime over 8 hours
+      ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+        if (totals[day] > 8) {
+          overtime += totals[day] - 8;
+        }
+      });
+    } else {
+      // Other states: Weekly overtime over 40 hours
+      overtime = totals.total > 40 ? totals.total - 40 : 0;
+    }
+    
+    return overtime;
+  };
+
+  const handleSubmit = async (isDraft: boolean = false) => {
+    // Validate California attestations
+    if (!isDraft && employeeInfo?.state === 'CA' && !employeeInfo.is_exempt) {
+      if (!attestations.accurateTime || !attestations.breaksTaken || !attestations.noInjuries) {
+        alert('Please complete all attestations before submitting');
+        return;
+      }
     }
 
-    setTimeEntries([...timeEntries, newEntry])
-    setFormData({ day: '', project: '', hours: 8, description: '' })
-    setIsModalOpen(false)
-  }
+    setIsLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('Please login to submit timesheet');
+        return;
+      }
 
-  const getEntriesForDay = (day: string) => {
-    return timeEntries.filter(entry => entry.day === day)
-  }
+      // Validate entries
+      const validEntries = entries.filter(e => e.project_id && e.total > 0);
+      if (validEntries.length === 0) {
+        alert('Please add at least one project with hours');
+        return;
+      }
 
-  const getTotalHours = () => {
-    return timeEntries.reduce((total, entry) => total + entry.hours, 0).toFixed(2)
-  }
+      // Calculate totals and overtime
+      const totals = calculateDailyTotals();
+      const overtimeHours = calculateOvertime(totals);
+
+      // Create timecard with proper overtime calculation
+      const { data: timecard, error: timecardError } = await supabase
+        .from('timecards')
+        .insert({
+          employee_id: user.id,
+          week_ending: weekEnding,
+          total_hours: totals.total,
+          total_overtime: overtimeHours,
+          regular_hours: totals.total - overtimeHours,
+          status: isDraft ? 'draft' : 'pending',
+          submitted_at: isDraft ? null : new Date().toISOString(),
+          attestations: employeeInfo?.state === 'CA' ? attestations : null
+        })
+        .select()
+        .single();
+
+      if (timecardError) throw timecardError;
+
+      // Create time entries
+      for (const entry of validEntries) {
+        const { error: entryError } = await supabase
+          .from('time_entries')
+          .insert({
+            timecard_id: timecard.id,
+            project_id: entry.project_id,
+            monday: entry.monday,
+            tuesday: entry.tuesday,
+            wednesday: entry.wednesday,
+            thursday: entry.thursday,
+            friday: entry.friday,
+            saturday: entry.saturday,
+            sunday: entry.sunday,
+            total: entry.total
+          });
+
+        if (entryError) throw entryError;
+      }
+
+      alert(isDraft ? 'Timesheet saved as draft!' : 'Timesheet submitted successfully!');
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error submitting timesheet:', error);
+      alert('Error submitting timesheet. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    const currentDate = new Date(weekEnding);
+    currentDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
+    setWeekEnding(currentDate.toISOString().split('T')[0]);
+  };
+
+  const getWeekDateRange = () => {
+    const endDate = new Date(weekEnding);
+    const startDate = new Date(endDate);
+    startDate.setDate(endDate.getDate() - 6);
+    
+    const format = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${format(startDate)} - ${format(endDate)}`;
+  };
+
+  const getDayDate = (dayOffset: number) => {
+    const endDate = new Date(weekEnding);
+    const targetDate = new Date(endDate);
+    targetDate.setDate(endDate.getDate() - (6 - dayOffset));
+    return targetDate.getDate();
+  };
+
+  const totals = calculateDailyTotals();
+  const overtimeHours = calculateOvertime(totals);
+  const regularHours = Math.max(0, totals.total - overtimeHours);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">My Timesheet</h1>
-              <p className="text-gray-600">View and manage your time entries</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Beautiful Weekly Timesheet */}
-        <div className="bg-white rounded-xl shadow-xl overflow-hidden">
-          {/* Header Bar */}
-          <div className="bg-[#e31c79] px-8 py-6 flex items-center justify-between">
-            <div className="flex items-center space-x-6">
-              <button className="text-white hover:text-gray-100 transition-colors p-3 rounded-full hover:bg-[#c4186a]">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
+      {/* Header */}
+      <header className="bg-[#05202E] shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-200 hover:text-white"
+              >
+                <ArrowLeft className="h-5 w-5" />
               </button>
-              
-              <div className="text-center">
-                <h1 className="text-3xl font-bold text-white mb-2">Weekly Timesheet</h1>
-                <p className="text-base text-white font-medium">
-                  Week of Aug 11 - Aug 17, 2025
-                </p>
-              </div>
-              
-              <button className="text-white hover:text-gray-100 transition-colors p-3 rounded-full hover:bg-[#c4186a]">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="text-white font-bold text-xl">
-              Total Hours: {getTotalHours()}
-            </div>
-          </div>
-
-          {/* Week Grid */}
-          <div className="px-8 pb-8">
-            <div className="grid grid-cols-7 gap-6 mb-10">
-              {days.map((day, index) => (
-                <div key={index} className="bg-white rounded-xl shadow-lg p-6 min-h-[220px] hover:shadow-xl transition-all duration-300">
-                  <div className="text-center mb-4">
-                    <div className="font-bold text-gray-800 text-xl mb-1">{day}</div>
-                    <div className="text-[#e31c79] font-semibold text-base">
-                      {dates[index]}
-                    </div>
-                  </div>
-                  
-                  {/* Time entries for this day */}
-                  <div className="space-y-3">
-                    {getEntriesForDay(day).map((entry) => (
-                      <div key={entry.id} className="bg-gray-50 p-4 rounded-lg">
-                        <div className="font-semibold text-gray-800 text-sm truncate mb-1">{entry.project}</div>
-                        <div className="text-[#e31c79] font-bold text-sm">{entry.hours}h</div>
-                        {entry.description && (
-                          <div className="text-gray-600 text-xs mt-2 line-clamp-2">{entry.description}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-white/10 p-2 rounded-lg">
+                  <Briefcase className="h-5 w-5 text-white" />
                 </div>
-              ))}
+                <div>
+                  <h1 className="text-xl font-semibold text-white">New Timesheet Entry</h1>
+                  <span className="text-xs text-gray-300">West End Workforce</span>
+                </div>
+              </div>
             </div>
-
-            {/* Add Time Entry Button */}
-            <div className="text-center">
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="px-10 py-5 bg-[#e31c79] text-white rounded-xl hover:bg-[#c4186a] transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-2xl transform hover:-translate-y-1 cursor-pointer"
-              >
-                Add Time Entry
-              </button>
+            <div className="text-right">
+              <span className="text-sm text-gray-200">{userEmail}</span>
+              {employeeInfo && (
+                <div className="text-xs text-gray-400">
+                  {employeeInfo.is_exempt ? 'Exempt' : 'Non-Exempt'} • {employeeInfo.state}
+                </div>
+              )}
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-100 bg-opacity-80 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="px-10 py-8 border-b border-gray-100">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-3xl font-bold text-gray-900">Add Time Entry</h2>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors p-3 rounded-full hover:bg-gray-50"
-                >
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <p className="text-gray-600 font-medium text-lg">
-                Week of Aug 11 - Aug 17, 2025
-              </p>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Week Selector */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-[#e31c79]" />
+              <label className="text-sm font-medium text-gray-700">Week Ending:</label>
+              <input
+                type="date"
+                value={weekEnding}
+                onChange={(e) => setWeekEnding(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#e31c79] focus:border-[#e31c79]"
+              />
             </div>
-            
-            <div className="px-10 py-8 space-y-8">
-              {/* Day Selection */}
-              <div>
-                <label className="block text-base font-semibold text-gray-700 mb-4">Day</label>
-                <select
-                  value={formData.day}
-                  onChange={(e) => setFormData(prev => ({ ...prev, day: e.target.value }))}
-                  className="w-full p-5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#e31c79] focus:border-[#e31c79] transition-all duration-200 bg-white hover:border-gray-300 text-base"
-                >
-                  <option value="">Select a day</option>
-                  {days.map((day, index) => (
-                    <option key={index} value={day}>
-                      {day} {dates[index]}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigateWeek('prev')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ChevronLeft className="h-5 w-5 text-gray-600" />
+              </button>
+              <button
+                onClick={() => setWeekEnding(new Date().toISOString().split('T')[0])}
+                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+              >
+                Current Week
+              </button>
+              <button
+                onClick={() => navigateWeek('next')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ChevronRight className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 text-center text-lg font-medium text-gray-900">
+            {getWeekDateRange()}
+          </div>
+        </div>
 
-              {/* Project Selection */}
-              <div>
-                <label className="block text-base font-semibold text-gray-700 mb-4">Project</label>
-                <select
-                  value={formData.project}
-                  onChange={(e) => setFormData(prev => ({ ...prev, project: e.target.value }))}
-                  className="w-full p-5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#e31c79] focus:border-[#e31c79] transition-all duration-200 bg-white hover:border-gray-300 text-base"
-                >
-                  <option value="">Select a project</option>
-                  {projects.map((project, index) => (
-                    <option key={index} value={project}>{project}</option>
-                  ))}
-                </select>
-              </div>
+        {/* Timesheet Table */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-[#05202E] text-white">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium">PROJECT</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium w-20">
+                    MON<br/>{getDayDate(0)}
+                    {employeeInfo?.state === 'CA' && totals.monday > 8 && (
+                      <span className="text-orange-400 text-xs block">OT</span>
+                    )}
+                  </th>
+                  <th className="px-4 py-3 text-center text-sm font-medium w-20">
+                    TUE<br/>{getDayDate(1)}
+                    {employeeInfo?.state === 'CA' && totals.tuesday > 8 && (
+                      <span className="text-orange-400 text-xs block">OT</span>
+                    )}
+                  </th>
+                  <th className="px-4 py-3 text-center text-sm font-medium w-20">
+                    WED<br/>{getDayDate(2)}
+                    {employeeInfo?.state === 'CA' && totals.wednesday > 8 && (
+                      <span className="text-orange-400 text-xs block">OT</span>
+                    )}
+                  </th>
+                  <th className="px-4 py-3 text-center text-sm font-medium w-20">
+                    THU<br/>{getDayDate(3)}
+                    {employeeInfo?.state === 'CA' && totals.thursday > 8 && (
+                      <span className="text-orange-400 text-xs block">OT</span>
+                    )}
+                  </th>
+                  <th className="px-4 py-3 text-center text-sm font-medium w-20">
+                    FRI<br/>{getDayDate(4)}
+                    {employeeInfo?.state === 'CA' && totals.friday > 8 && (
+                      <span className="text-orange-400 text-xs block">OT</span>
+                    )}
+                  </th>
+                  <th className="px-4 py-3 text-center text-sm font-medium w-20">
+                    SAT<br/>{getDayDate(5)}
+                    {employeeInfo?.state === 'CA' && totals.saturday > 8 && (
+                      <span className="text-orange-400 text-xs block">OT</span>
+                    )}
+                  </th>
+                  <th className="px-4 py-3 text-center text-sm font-medium w-20">
+                    SUN<br/>{getDayDate(6)}
+                    {employeeInfo?.state === 'CA' && totals.sunday > 8 && (
+                      <span className="text-orange-400 text-xs block">OT</span>
+                    )}
+                  </th>
+                  <th className="px-4 py-3 text-center text-sm font-medium w-24">TOTAL</th>
+                  <th className="px-4 py-3 w-10"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {entries.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <select
+                        value={entry.project_id}
+                        onChange={(e) => updateProject(entry.id, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#e31c79] focus:border-[#e31c79]"
+                      >
+                        <option value="">Select a project...</option>
+                        {projects.map(project => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                      <td key={day} className="px-2 py-3">
+                        <input
+                          type="number"
+                          min="0"
+                          max="24"
+                          step="0.5"
+                          value={entry[day as keyof TimeEntry] || ''}
+                          onChange={(e) => updateHours(entry.id, day, e.target.value)}
+                          className="w-full px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#e31c79] focus:border-[#e31c79]"
+                        />
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 text-center font-medium text-[#e31c79]">
+                      {entry.total.toFixed(1)}
+                    </td>
+                    <td className="px-2 py-3">
+                      {entries.length > 1 && (
+                        <button
+                          onClick={() => removeRow(entry.id)}
+                          className="p-1 text-red-500 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-gray-50 font-medium">
+                  <td className="px-4 py-3 text-right">Daily Totals:</td>
+                  <td className={`px-2 py-3 text-center ${employeeInfo?.state === 'CA' && totals.monday > 8 ? 'text-orange-600' : ''}`}>
+                    {totals.monday.toFixed(1)}
+                  </td>
+                  <td className={`px-2 py-3 text-center ${employeeInfo?.state === 'CA' && totals.tuesday > 8 ? 'text-orange-600' : ''}`}>
+                    {totals.tuesday.toFixed(1)}
+                  </td>
+                  <td className={`px-2 py-3 text-center ${employeeInfo?.state === 'CA' && totals.wednesday > 8 ? 'text-orange-600' : ''}`}>
+                    {totals.wednesday.toFixed(1)}
+                  </td>
+                  <td className={`px-2 py-3 text-center ${employeeInfo?.state === 'CA' && totals.thursday > 8 ? 'text-orange-600' : ''}`}>
+                    {totals.thursday.toFixed(1)}
+                  </td>
+                  <td className={`px-2 py-3 text-center ${employeeInfo?.state === 'CA' && totals.friday > 8 ? 'text-orange-600' : ''}`}>
+                    {totals.friday.toFixed(1)}
+                  </td>
+                  <td className={`px-2 py-3 text-center ${employeeInfo?.state === 'CA' && totals.saturday > 8 ? 'text-orange-600' : ''}`}>
+                    {totals.saturday.toFixed(1)}
+                  </td>
+                  <td className={`px-2 py-3 text-center ${employeeInfo?.state === 'CA' && totals.sunday > 8 ? 'text-orange-600' : ''}`}>
+                    {totals.sunday.toFixed(1)}
+                  </td>
+                  <td className="px-4 py-3 text-center text-lg font-bold text-[#e31c79]">
+                    {totals.total.toFixed(1)}
+                  </td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-              {/* Hours Input */}
+        {/* Summary Stats */}
+        <div className="bg-white rounded-lg shadow-sm p-4 mt-4">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">Regular Hours:</span> {regularHours.toFixed(1)}
+            </div>
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">
+                Overtime Hours {employeeInfo?.state === 'CA' ? '(8+ daily)' : '(40+ weekly)'}:
+              </span> 
+              <span className={overtimeHours > 0 ? 'text-orange-600 font-bold ml-1' : 'ml-1'}>
+                {overtimeHours.toFixed(1)}
+              </span>
+            </div>
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">Total Week Hours:</span> 
+              <span className="text-[#e31c79] font-bold ml-1">{totals.total.toFixed(1)}</span>
+            </div>
+            {employeeInfo && !employeeInfo.is_exempt && (
+              <div className="text-xs text-gray-500">
+                Status: Non-Exempt
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* California Attestations */}
+        {employeeInfo?.state === 'CA' && !employeeInfo.is_exempt && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+            <div className="flex items-start gap-2 mb-3">
+              <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
               <div>
-                <label className="block text-base font-semibold text-gray-700 mb-4">Hours</label>
+                <h3 className="font-medium text-gray-900">California Employee Attestations</h3>
+                <p className="text-sm text-gray-600">Required for timesheet submission</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2">
                 <input
-                  type="number"
-                  step="0.25"
-                  min="0.25"
-                  max="16"
-                  value={formData.hours || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, hours: parseFloat(e.target.value) || 0 }))}
-                  className="w-full p-5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#e31c79] focus:border-[#e31c79] transition-all duration-200 bg-white hover:border-gray-300 text-base"
-                  placeholder="Enter hours worked (e.g., 8.5)"
+                  type="checkbox"
+                  checked={attestations.accurateTime}
+                  onChange={(e) => setAttestations({...attestations, accurateTime: e.target.checked})}
+                  className="rounded text-[#e31c79]"
                 />
-                <p className="text-sm text-gray-500 mt-3">Increments of 0.25, max 16 hours</p>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-base font-semibold text-gray-700 mb-4">Description (Optional)</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  rows={4}
-                  className="w-full p-5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#e31c79] focus:border-[#e31c79] transition-all duration-200 bg-white hover:border-gray-300 resize-none text-base"
-                  placeholder="Enter description..."
+                <span className="text-sm">I have entered all time worked accurately</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={attestations.breaksTaken}
+                  onChange={(e) => setAttestations({...attestations, breaksTaken: e.target.checked})}
+                  className="rounded text-[#e31c79]"
                 />
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="px-10 py-8 border-t border-gray-100 flex space-x-6">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="flex-1 px-8 py-4 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 font-semibold text-base"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddTimeEntry}
-                className="flex-1 px-8 py-4 bg-[#e31c79] text-white rounded-xl hover:bg-[#c4186a] transition-all duration-200 font-semibold text-base shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-              >
-                Save Entry
-              </button>
+                <span className="text-sm">I have taken all required meal and rest breaks</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={attestations.noInjuries}
+                  onChange={(e) => setAttestations({...attestations, noInjuries: e.target.checked})}
+                  className="rounded text-[#e31c79]"
+                />
+                <span className="text-sm">I have not sustained any work-related injuries this week</span>
+              </label>
             </div>
           </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center mt-6">
+          <button
+            onClick={addRow}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Row
+          </button>
+          
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleSubmit(true)}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              Save as Draft
+            </button>
+            <button
+              onClick={() => handleSubmit(false)}
+              disabled={isLoading || totals.total === 0}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e31c79] text-white rounded-lg hover:bg-[#c91865] transition-colors disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" />
+              Submit Timesheet
+            </button>
+          </div>
         </div>
-      )}
+      </main>
     </div>
-  )
+  );
 }

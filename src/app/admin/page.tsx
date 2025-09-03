@@ -1,507 +1,372 @@
-'use client'
+'use client';
 
-import { useAuth } from '@/contexts/AuthContext'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import ProtectedRoute from '@/components/auth/ProtectedRoute'
-import TopNavigation from '@/components/navigation/TopNavigation'
+// src/app/admin/page.tsx
+
+import React, { useState, useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
+import RoleGuard from '@/components/auth/RoleGuard';
+import type { Database } from '@/types/supabase';
+import type { Employee } from '@/types';
 import { 
-  Users, 
-  Building2, 
-  Clock, 
-  Receipt, 
-  BarChart3, 
-  Settings, 
-  CheckCircle,
-  AlertCircle,
-  TrendingUp,
-  DollarSign,
-  UserPlus,
-  FolderPlus,
-  FileText,
-  ArrowRight,
-  ChevronRight,
-  Bell
-} from 'lucide-react'
+  Users, Clock, DollarSign, Building2, FileText, 
+  TrendingUp, Settings, AlertCircle, BarChart3,
+  Receipt, FolderOpen, UserCog, CreditCard,
+  LogOut, Briefcase
+} from 'lucide-react';
 
 interface AdminStats {
-  totalUsers: number
-  activeProjects: number
-  pendingTimesheets: number
-  pendingExpenses: number
-  totalRevenue: number
-  activeClients: number
-  missingTimesheets: number
-  overdueApprovals: number
+  totalEmployees: number;
+  activeEmployees: number;
+  totalClients: number;
+  activeProjects: number;
+  pendingTimesheets: number;
+  pendingExpenses: number;
+  currentMonthRevenue: number;
+  currentMonthHours: number;
 }
 
-export default function AdminDashboardPage() {
-  const { user } = useAuth()
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
-  const [adminStats, setAdminStats] = useState<AdminStats>({
-    totalUsers: 0,
+export default function AdminDashboard() {
+  const [admin, setAdmin] = useState<Employee | null>(null);
+  const [stats, setStats] = useState<AdminStats>({
+    totalEmployees: 0,
+    activeEmployees: 0,
+    totalClients: 0,
     activeProjects: 0,
     pendingTimesheets: 0,
     pendingExpenses: 0,
-    totalRevenue: 0,
-    activeClients: 0,
-    missingTimesheets: 0,
-    overdueApprovals: 0
-  })
+    currentMonthRevenue: 0,
+    currentMonthHours: 0
+  });
+  const [loading, setLoading] = useState(true);
+  
+  const router = useRouter();
+  const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
-    // Simulate loading admin data
-    setTimeout(() => {
-      setAdminStats({
-        totalUsers: 47,
-        activeProjects: 12,
-        pendingTimesheets: 8,
-        pendingExpenses: 15,
-        totalRevenue: 125000,
-        activeClients: 8,
-        missingTimesheets: 23,
-        overdueApprovals: 5
-      })
-      setIsLoading(false)
-    }, 1000)
-  }, [])
+    checkAuthAndLoadData();
+  }, []);
 
-  const handleCardClick = (route: string) => {
-    router.push(route)
-  }
-
-  const handleQuickAction = (action: string) => {
-    switch (action) {
-      case 'employees':
-        router.push('/admin/employees')
-        break
-      case 'clients':
-        router.push('/admin/clients')
-        break
-      case 'timesheets':
-        router.push('/admin/timesheets')
-        break
-      case 'expenses':
-        router.push('/admin/expenses')
-        break
-      case 'reports':
-        router.push('/admin/reports')
-        break
-      case 'settings':
-        router.push('/admin/settings')
-        break
-      default:
-        break
-    }
-  }
-
-  const handleNotificationTest = async (type: string) => {
+  const checkAuthAndLoadData = async () => {
     try {
-      let message = ''
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
       
-      switch (type) {
-        case 'timesheet':
-          // Create test timesheet notification
-          const timesheetResponse = await fetch('/api/notifications', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              type: 'timesheet_submitted',
-              userId: user?.id || 'admin-test',
-              relatedId: 'test-timesheet-123',
-              relatedType: 'timesheet',
-              metadata: {
-                employeeName: 'Test Employee',
-                managerName: user ? `${user.first_name} ${user.last_name}` : 'Admin',
-                period: 'Test Week',
-                totalHours: '40',
-                approvalUrl: '/admin/timesheets'
-              }
-            }),
-          });
-          
-          if (timesheetResponse.ok) {
-            message = 'Test timesheet notification created successfully!'
-          } else {
-            throw new Error('Failed to create timesheet notification')
-          }
-          break
-          
-        case 'expense':
-          // Create test expense notification
-          const expenseResponse = await fetch('/api/notifications', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              type: 'expense_submitted',
-              userId: user?.id || 'admin-test',
-              relatedId: 'test-expense-456',
-              relatedType: 'expense',
-              metadata: {
-                employeeName: 'Test Employee',
-                managerName: user ? `${user.first_name} ${user.last_name}` : 'Admin',
-                amount: 150.00,
-                description: 'Test expense for office supplies',
-                approvalUrl: '/admin/expenses'
-              }
-            }),
-          });
-          
-          if (expenseResponse.ok) {
-            message = 'Test expense notification created successfully!'
-          } else {
-            throw new Error('Failed to create expense notification')
-          }
-          break
-          
-        case 'overdue':
-          // Create test overdue notification
-          const overdueResponse = await fetch('/api/notifications', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              type: 'timesheet_overdue',
-              userId: user?.id || 'admin-test',
-              relatedId: 'test-overdue-789',
-              relatedType: 'timesheet',
-              metadata: {
-                employeeName: 'Test Employee',
-                period: 'Overdue Week',
-                daysOverdue: 3,
-                dueDate: new Date().toISOString().split('T')[0],
-                submitUrl: '/admin/timesheets'
-              }
-            }),
-          });
-          
-          if (overdueResponse.ok) {
-            message = 'Test overdue alert created successfully!'
-          } else {
-            throw new Error('Failed to create overdue notification')
-          }
-          break
-          
-        case 'email':
-          // Test email configuration
-          const emailResponse = await fetch('/api/notifications/test-email', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              toEmail: 'tgarrick@westendworkforce.com',
-              testType: 'configuration'
-            }),
-          });
-          
-          if (emailResponse.ok) {
-            const result = await emailResponse.json()
-            message = result.message || 'Email configuration test completed!'
-          } else {
-            throw new Error('Failed to test email configuration')
-          }
-          break
-          
-        default:
-          message = 'Test notification sent successfully!'
-          break
+      if (authError || !user) {
+        router.push('/auth/login');
+        return;
       }
-      
-      // Show success message
-      alert(message)
-    } catch (error) {
-      console.error('Notification test failed:', error)
-      alert('Test failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
-    }
-  }
 
-  if (isLoading) {
+      // Get admin info
+      const { data: adminData } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (adminData?.role !== 'admin') {
+        if (adminData?.role === 'manager') {
+          router.push('/manager');
+        } else {
+          router.push('/dashboard');
+        }
+        return;
+      }
+
+      setAdmin(adminData);
+      await loadStats();
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const { count: totalEmp } = await supabase
+        .from('employees')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: activeEmp } = await supabase
+        .from('employees')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      const { count: totalClients } = await supabase
+        .from('clients')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      const { count: activeProjects } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+
+      const { count: pendingTime } = await supabase
+        .from('timesheets')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'submitted');
+
+      const { count: pendingExp } = await supabase
+        .from('expenses')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'submitted');
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const { data: monthTimecards } = await supabase
+        .from('timesheets')
+        .select('total_hours')
+        .gte('week_ending', startOfMonth.toISOString())
+        .eq('status', 'approved');
+
+      const monthHours = monthTimecards?.reduce((sum, tc) => sum + (tc.total_hours || 0), 0) || 0;
+
+      setStats({
+        totalEmployees: totalEmp || 0,
+        activeEmployees: activeEmp || 0,
+        totalClients: totalClients || 0,
+        activeProjects: activeProjects || 0,
+        pendingTimesheets: pendingTime || 0,
+        pendingExpenses: pendingExp || 0,
+        currentMonthRevenue: monthHours * 150,
+        currentMonthHours: monthHours
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/auth/login');
+  };
+
+  const mainSections = [
+    {
+      title: 'Employee Management',
+      description: 'Manage workforce and permissions',
+      path: '/admin/employees',
+      badge: null
+    },
+    {
+      title: 'Review Timesheets',
+      description: `${stats.pendingTimesheets} pending approval`,
+      path: '/admin/timesheets',
+      badge: stats.pendingTimesheets
+    },
+    {
+      title: 'Review Expenses',
+      description: `${stats.pendingExpenses} pending approval`,
+      path: '/admin/expenses',
+      badge: stats.pendingExpenses
+    },
+    {
+      title: 'Client Management',
+      description: 'Manage client organizations',
+      path: '/admin/clients',
+      badge: null
+    },
+    {
+      title: 'Reports & Analytics',
+      description: 'View insights and reports',
+      path: '/admin/reports',
+      badge: null
+    },
+    {
+      title: 'Billing & Invoicing',
+      description: 'Generate invoices and statements',
+      path: '/admin/billing',
+      badge: null
+    },
+    {
+      title: 'Project Management',
+      description: 'Manage projects and assignments',
+      path: '/admin/projects',
+      badge: null
+    },
+    {
+      title: 'System Settings',
+      description: 'Configure system preferences',
+      path: '/admin/settings',
+      badge: null
+    }
+  ];
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#e31c79] mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading Admin Dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#e31c79] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <ProtectedRoute allowedRoles={['admin']}>
+    <RoleGuard allowedRoles={['admin']}>
       <div className="min-h-screen bg-gray-50">
-        {/* Header - EXACTLY matching Manager Dashboard */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <img 
-                src="/WE logo FC Mar2024.png" 
-                alt="West End Workforce Logo" 
-                className="w-10 h-10 object-contain"
-              />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">West End Workforce</h1>
-                <p className="text-sm text-gray-600">Timesheet & Expense Management</p>
+        {/* Header */}
+        <header className="bg-[#05202E] shadow-lg">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/10 p-2 rounded-lg">
+                    <Briefcase className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-semibold text-white">
+                      West End Workforce
+                    </h1>
+                    <span className="text-xs text-gray-300">Admin Portal</span>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                {user ? `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}` : 'A'}
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-medium text-gray-900">{user ? `${user.first_name} ${user.last_name}` : 'Admin'}</div>
-                <div className="text-xs text-gray-500">Admin</div>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-200">{admin?.email}</span>
+                <button
+                  onClick={() => router.push('/manager')}
+                  className="text-sm text-gray-200 hover:text-white"
+                >
+                  Manager View
+                </button>
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="text-sm text-gray-200 hover:text-white"
+                >
+                  Employee View
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-200 hover:text-white"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
         {/* Welcome Section */}
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Welcome back, {user ? `${user.first_name} ${user.last_name}` : 'Admin'}!</h1>
-            <p className="text-gray-600">West End Workforce • System Administrator</p>
+        <div className="bg-[#05202E] text-white pb-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <h2 className="text-2xl font-bold">Welcome back, {admin?.first_name}!</h2>
+            <p className="text-gray-300 mt-1">System Administrator • West End Workforce</p>
           </div>
         </div>
 
-        {/* Stats Cards - EXACTLY matching Manager Dashboard */}
-        <div className="px-6 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div 
-              onClick={() => handleCardClick('/admin/employees')}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200 cursor-pointer group"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Users</p>
-                  <p className="text-2xl font-bold text-gray-900">{adminStats.totalUsers}</p>
-                </div>
-                <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center">
-                  <Users className="w-6 h-6 text-pink-600" />
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-pink-600 transition-colors mt-2" />
-            </div>
-
-            <div 
-              onClick={() => handleCardClick('/admin/clients')}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200 cursor-pointer group"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Active Clients</p>
-                  <p className="text-2xl font-bold text-gray-900">{adminStats.activeClients}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors mt-2" />
-            </div>
-
-            <div 
-              onClick={() => handleCardClick('/admin/timesheets')}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200 cursor-pointer group"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Pending Timesheets</p>
-                  <p className="text-2xl font-bold text-gray-900">{adminStats.pendingTimesheets}</p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors mt-2" />
-            </div>
-
-            <div 
-              onClick={() => handleCardClick('/admin/expenses')}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200 cursor-pointer group"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Pending Expenses</p>
-                  <p className="text-2xl font-bold text-gray-900">{adminStats.pendingExpenses}</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors mt-2" />
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions - EXACTLY matching Employee Dashboard */}
-        <div className="px-6 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div 
-              className="block p-6 rounded-lg border bg-pink-50 border-pink-200 hover:bg-pink-100 text-pink-700 transition-all hover:shadow-md cursor-pointer"
-              onClick={() => handleQuickAction('employees')}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 rounded-lg bg-white">
-                    <Users className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Employee Management</h3>
-                    <p className="text-sm opacity-75">Manage team members</p>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 opacity-75" />
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <div>
+                <p className="text-xs text-gray-600">Total Employees</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalEmployees}</p>
+                <p className="text-xs text-green-600 mt-1">{stats.activeEmployees} active</p>
               </div>
             </div>
 
-            <div 
-              className="block p-6 rounded-lg border bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700 transition-all hover:shadow-md cursor-pointer"
-              onClick={() => handleQuickAction('clients')}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 rounded-lg bg-white">
-                    <Building2 className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Client Management</h3>
-                    <p className="text-sm opacity-75">Manage client accounts</p>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 opacity-75" />
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <div>
+                <p className="text-xs text-gray-600">Active Clients</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalClients}</p>
               </div>
             </div>
 
-            <div 
-              className="block p-6 rounded-lg border bg-green-50 border-green-200 hover:bg-green-100 text-green-700 transition-all hover:shadow-md cursor-pointer"
-              onClick={() => handleQuickAction('reports')}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 rounded-lg bg-white">
-                    <BarChart3 className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">System Reports</h3>
-                    <p className="text-sm opacity-75">Generate system reports</p>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 opacity-75" />
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <div>
+                <p className="text-xs text-gray-600">Pending Approvals</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {stats.pendingTimesheets + stats.pendingExpenses}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.pendingTimesheets} timesheets, {stats.pendingExpenses} expenses
+                </p>
               </div>
             </div>
 
-            <div 
-              className="block p-6 rounded-lg border bg-purple-50 border-purple-200 hover:bg-purple-100 text-purple-700 transition-all hover:shadow-md cursor-pointer"
-              onClick={() => handleQuickAction('settings')}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 rounded-lg bg-white">
-                    <Settings className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">System Settings</h3>
-                    <p className="text-sm opacity-75">Configure system options</p>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 opacity-75" />
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <div>
+                <p className="text-xs text-gray-600">Month Revenue</p>
+                <p className="text-xl font-bold text-green-600">
+                  {formatCurrency(stats.currentMonthRevenue)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">{stats.currentMonthHours} hours billed</p>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Notification Testing Section */}
-        <div className="px-6 py-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Bell className="w-5 h-5 text-orange-600" />
-              Notification Testing
-            </h3>
-            <p className="text-gray-600 mb-4">Test notification system safely</p>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <button 
-                onClick={() => handleNotificationTest('timesheet')}
-                className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors"
+          {/* Action Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {mainSections.map((section) => (
+              <button
+                key={section.path}
+                onClick={() => router.push(section.path)}
+                className="bg-white rounded-lg shadow-sm p-6 hover:shadow-lg transition-all duration-200 text-left relative"
               >
-                Test Timesheet Notification
+                {section.badge && section.badge > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                    {section.badge}
+                  </span>
+                )}
+                <h3 className="text-base font-semibold text-gray-900 mb-1">
+                  {section.title}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {section.description}
+                </p>
               </button>
-              <button 
-                onClick={() => handleNotificationTest('expense')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Test Expense Notification
-              </button>
-              <button 
-                onClick={() => handleNotificationTest('overdue')}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-              >
-                Test Overdue Alert
-              </button>
-              <button 
-                onClick={() => handleNotificationTest('email')}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Test Email Config
-              </button>
-            </div>
+            ))}
           </div>
-        </div>
 
-        {/* System Overview - EXACTLY matching Employee Dashboard style */}
-        <div className="px-6 py-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">System Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Total Revenue</p>
-                    <p className="text-lg font-bold text-green-600">${adminStats.totalRevenue.toLocaleString()}</p>
-                  </div>
-                </div>
+          {/* Action Required Section */}
+          {(stats.pendingTimesheets > 0 || stats.pendingExpenses > 0) && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="h-5 w-5 text-orange-600" />
+                <h3 className="text-base font-semibold text-orange-900">Action Required</h3>
               </div>
-              
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <AlertCircle className="h-5 w-5 text-orange-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Missing Timesheets</p>
-                    <p className="text-lg font-bold text-orange-600">{adminStats.missingTimesheets}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Clock className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Overdue Approvals</p>
-                    <p className="text-lg font-bold text-blue-600">{adminStats.overdueApprovals}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <FolderPlus className="h-5 w-5 text-purple-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Active Projects</p>
-                    <p className="text-lg font-bold text-purple-600">{adminStats.activeProjects}</p>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                {stats.pendingTimesheets > 0 && (
+                  <button
+                    onClick={() => router.push('/admin/timesheets')}
+                    className="w-full text-left p-3 bg-white rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-between"
+                  >
+                    <span className="text-sm">
+                      <strong>{stats.pendingTimesheets}</strong> timesheets awaiting approval
+                    </span>
+                    <span className="text-orange-600">→</span>
+                  </button>
+                )}
+                {stats.pendingExpenses > 0 && (
+                  <button
+                    onClick={() => router.push('/admin/expenses')}
+                    className="w-full text-left p-3 bg-white rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-between"
+                  >
+                    <span className="text-sm">
+                      <strong>{stats.pendingExpenses}</strong> expense reports awaiting approval
+                    </span>
+                    <span className="text-orange-600">→</span>
+                  </button>
+                )}
               </div>
             </div>
-          </div>
-        </div>
+          )}
+        </main>
       </div>
-    </ProtectedRoute>
-  )
+    </RoleGuard>
+  );
 }
