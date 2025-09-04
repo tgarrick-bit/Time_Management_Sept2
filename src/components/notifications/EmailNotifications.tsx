@@ -162,7 +162,7 @@ export default function EmailNotifications({ className = '' }: EmailNotification
     }
   ];
 
-  const useTemplate = (template: typeof emailTemplates[0]) => {
+  const applyTemplate = (template: typeof emailTemplates[0]) => {
     setEmailForm({
       ...emailForm,
       subject: template.subject,
@@ -241,7 +241,7 @@ export default function EmailNotifications({ className = '' }: EmailNotification
                 {emailTemplates.map((template, index) => (
                   <button
                     key={index}
-                    onClick={() => useTemplate(template)}
+                    onClick={() => applyTemplate(template)}
                     className="p-2 text-xs text-left bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 transition-colors"
                   >
                     <div className="font-medium text-gray-900">{template.name}</div>
