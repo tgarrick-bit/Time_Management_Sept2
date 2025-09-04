@@ -59,7 +59,7 @@ export default function TimesheetEntryPage() {
   const [employeeInfo, setEmployeeInfo] = useState<Employee | null>(null);
   const [attestations, setAttestations] = useState({
     accurateTime: false,
-    breaksaken: false,
+    breaksTaken: false,
     noInjuries: false
   });
 
